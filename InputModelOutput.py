@@ -6,17 +6,9 @@
     Created on Fri June 16 10:43:05 2017
 """
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+
 import keras
-=======
 
-
->>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
-=======
-
-
->>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -74,7 +66,7 @@ def get_input_data(dataframe):
     """
     return dataframe[["r", "phi", "z"]].values
 
-<<<<<<< HEAD
+
 def get_output_data(dataframe):
     """ Retrieve the output data in the correct format form 'dataframe'.
         @param  dataframe :: pd.DataFrame
@@ -101,7 +93,7 @@ def get_output_data(dataframe):
 def main():
     filename  = ('file_o_stuff3.csv')
     dataframe = pd.read_csv(filename)
-=======
+
 
 import matplotlib.pyplot as plt
 
@@ -123,7 +115,7 @@ from keras.layers import Dense, Activation
 def getInputData(filename):
     #Takes a csv file with headers: id, z, phi, eta, val, r, zl
     #Returns a 3D array with values z, phi, r to put into a network(as input)
->>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
+
     
     train_data  = get_input_data (dataframe)
     target_data = get_output_data(dataframe)
@@ -134,7 +126,7 @@ def getInputData(filename):
     simple.add(Activation('softmax'))
     simple.compile(loss='categorical_crossentropy', optimizer='sgd', metrics['accuracy'])
     
-<<<<<<< HEAD
+
     simple.summary()
     
     hist = simple.fit( train_data,
@@ -152,7 +144,7 @@ print("=== The program is starting. ===")
 main()
 print("=== The program is ending. ===")
 
-=======
+
     #Remove id, eta, val, and z
     refData = initData.drop(['id', 'eta', 'val', 'zl'], axis=1).values
     return refData
@@ -222,9 +214,7 @@ hist = simple.fit( train_data,
                             ModelCheckpoint(filepath='simple.h5', verbose=0)]
                   )
 
-<<<<<<< HEAD
+
 show_losses([("cat x entropy", hist)])
->>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
-=======
-show_losses([("cat x entropy", hist)])
->>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
+
+
