@@ -7,7 +7,12 @@
 """
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import keras
+=======
+
+
+>>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
 =======
 
 
@@ -97,6 +102,15 @@ def main():
     filename  = ('file_o_stuff3.csv')
     dataframe = pd.read_csv(filename)
 =======
+
+import matplotlib.pyplot as plt
+
+import keras
+from keras.models import Sequntial
+from keras.layers import Dense, Activation
+
+
+
 
 import matplotlib.pyplot as plt
 
@@ -208,5 +222,9 @@ hist = simple.fit( train_data,
                             ModelCheckpoint(filepath='simple.h5', verbose=0)]
                   )
 
+<<<<<<< HEAD
+show_losses([("cat x entropy", hist)])
+>>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
+=======
 show_losses([("cat x entropy", hist)])
 >>>>>>> 19576a8afde8d8b69a1627c4473b3aa91f1fc97f
