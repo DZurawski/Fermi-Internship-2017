@@ -6,13 +6,13 @@
     Created on Fri June 16 10:43:05 2017
 """
 
-<<<<<<< HEAD
+
 
 import keras
 
-=======
+
 import keras
->>>>>>> 53829a097f2ba2a889274c3f32378e18ef8df847
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -70,10 +70,7 @@ def get_input_data(dataframe):
     """
     return dataframe[["r", "phi", "z"]].values
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 53829a097f2ba2a889274c3f32378e18ef8df847
 def get_output_data(dataframe):
     """ Retrieve the output data in the correct format form 'dataframe'.
         @param  dataframe :: pd.DataFrame
@@ -100,7 +97,6 @@ def get_output_data(dataframe):
 def main():
     filename  = ('file_o_stuff3.csv')
     dataframe = pd.read_csv(filename)
-<<<<<<< HEAD
 
 
 import matplotlib.pyplot as plt
@@ -124,8 +120,7 @@ def getInputData(filename):
     #Takes a csv file with headers: id, z, phi, eta, val, r, zl
     #Returns a 3D array with values z, phi, r to put into a network(as input)
 
-=======
->>>>>>> 53829a097f2ba2a889274c3f32378e18ef8df847
+
     
     train_data  = get_input_data (dataframe)
     target_data = get_output_data(dataframe)
@@ -136,10 +131,7 @@ def getInputData(filename):
     simple.add(Activation('softmax'))
     simple.compile(loss='categorical_crossentropy', optimizer='sgd', metrics['accuracy'])
     
-<<<<<<< HEAD
 
-=======
->>>>>>> 53829a097f2ba2a889274c3f32378e18ef8df847
     simple.summary()
     
     hist = simple.fit( train_data,
@@ -157,7 +149,6 @@ print("=== The program is starting. ===")
 main()
 print("=== The program is ending. ===")
 
-<<<<<<< HEAD
 
     #Remove id, eta, val, and z
     refData = initData.drop(['id', 'eta', 'val', 'zl'], axis=1).values
@@ -232,5 +223,4 @@ hist = simple.fit( train_data,
 show_losses([("cat x entropy", hist)])
 
 
-=======
->>>>>>> 53829a097f2ba2a889274c3f32378e18ef8df847
+
