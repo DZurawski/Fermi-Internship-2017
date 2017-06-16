@@ -27,17 +27,20 @@ def get_output_data(dataframe):
                     A matrix where a given column at index i is the probability
                     vector of which track the particle at index i belongs to.
     """
-    tracks  = dataframe[["id"]].values[:,0]
-    uniques = np.unique(tracks)
-    matrix  = np.zeros((tracks.size, uniques.size))
+    IDs     = dataframe[["id"]].values[:,0] # The track id's for each hit.
+    uniques = np.unique(IDs) # The unique track id's.
+    matrix  = np.zeros((IDs.size, uniques.size)) # The probability matrix.
     
-    track2row = dict() 
-    for i, track in enumerate(uniques):
-        track2row[track] = i
+    # Create a way to map track id number to an index
+    # in the probability matrix.
+    ID2row = dict() 
+    for col, ID in enumerate(uniques):
+        ID2row[ID] = col
      
-    for i, track in enumerate(tracks):
-        matrix[i, track2row[track]] = 1
-        
+    # Populate the probability matrix with 100% certainty values.
+    for col, ID in enumerate(IDs):
+        matrix[col, ID2row[ID]] = 1
+
     return matrix
 
 def main():
