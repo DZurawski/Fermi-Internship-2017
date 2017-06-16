@@ -18,6 +18,6 @@ def getInputData(filename):
     #Remove id, eta, val, and z
     refData = initData.drop(['id', 'eta', 'val', 'zl'], axis=1).values
     return refData
-
+# HELLO THERE! (Daniel)
 data = getInputData("file_o_stuff3.csv")
 print(data)
