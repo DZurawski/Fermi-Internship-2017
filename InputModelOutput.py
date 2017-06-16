@@ -6,7 +6,6 @@
     Created on Fri June 16 10:43:05 2017
 """
 
-import keras
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -85,7 +84,7 @@ def get_output_data(dataframe):
     for col, ID in enumerate(IDs):
         matrix[col, ID2row[ID]] = 1
 
-    return matrix
+    return numpy.flatten(matrix)
 
 def main():
     filename  = ('file_o_stuff3.csv')
@@ -96,7 +95,7 @@ def main():
 
     simple = Sequntial()
     simple.add(Dense(32, input_dim=np.unique(tracks).size*4, activation='relu'))
-    simple.add(Dense(3, kernel_initializer='uniform'))
+    simple.add(Dense(, kernel_initializer='uniform'))
     simple.add(Activation('softmax'))
     simple.compile(loss='categorical_crossentropy', optimizer='sgd', metrics['accuracy'])
     
@@ -116,4 +115,3 @@ def main():
 print("=== The program is starting. ===")
 main()
 print("=== The program is ending. ===")
-
