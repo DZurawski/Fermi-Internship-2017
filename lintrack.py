@@ -68,34 +68,55 @@ class LinearTracker():
             @return Nothing
         """
         self.dataframe = dataframe
-        groups = self.dataframe.groupby("id") # Hits grouped by track ID.
-        tracks = [group[1] for group in groups] # Track data - list of pd.DataFrame
-        TPE, L = tracks_per_event, dataframe.size # Renames for brevity.
+        groups = self.dataframe.groupby("id")     # Hits grouped by track ID.
+        tracks = [group[1] for group in groups]   # Track data - list of pd.DataFrame
+        TPE, L = tracks_per_event, len(tracks) # Renames for brevity.
         events = [tracks[i:i+TPE] for i in range(0, L, TPE)] # Sliced track data
         self.test_input  = [[track[["z", "phi", "r"]].values for track in event] for event in events]
+        self.test_output = []
         
+        for event in events:
+            num_hits = sum([len(track) for track in event])
+            matrix   = np.zeros((num_hits, TPE))
+            
+            T2I = dict()
+            
+            for i, track in enumerate(event):
+                T2I[track["id"].values[0]] = i
+            
+            hit_idx = 0
+            for i, track in enumerate(event):
+                IDs = track["id"].values
+                for j, ID in enumerate(IDs):
+                    matrix[hit_idx, T2I[ID]] = 1
+                    hit_idx += 1
+            
+            self.test_output.append(matrix)
         
+#         matrices = []
+#         for event in events:
+#             print(type(event[0]))
+#             matrix = np.zeros()
+#             for track in event:
+#                 IDs     = track[["id"]] # The track id's for each hit.
+#                 uniques = np.unique(IDs) # The unique track id's.
+#                 matrix  = np.zeros((IDs.size, uniques.size)) # The probability matrix.
+#                 print(matrix)
+#                 # Create a way to map track id number to an index in the probability matrix.
+#                 ID2row = dict() 
+#                 for col, ID in enumerate(uniques):
+#                     ID2row[ID] = col
+#                  
+#                 # Populate the probability matrix with 100% certainty values.
+#                 for col, ID in enumerate(IDs):
+#                     matrix[col, ID2row[ID]] = 1
+
         
-        
-        for i, event in enumerate(self.test_input):
-            print("Event {}".format(i))
-            for j, track in enumerate(event):
-                print("Track {}".format(j))
-                print(track)
-        
-        #self.__extract_test_input__ (tracks, tracks_per_event)
-        #self.__extract_test_output__(tracks, tracks_per_event)
-    
-    def __extract_test_input__(self, tracks, tracks_per_event):
-        positions = [track[["z", "phi", "r"]].values for track in tracks]
-        TPE, L    = tracks_per_event, len(positions) # For brevity
-        self.test_input = [positions[i:i+TPE] for i in range(0, L, TPE)]
-         
-        for i, event in enumerate(self.test_input):
-            print("Event {}".format(i))
-            for j, track in enumerate(event):
-                print("Track {}".format(j))
-                print(track)
+#         for i, event in enumerate(self.test_input):
+#             print("Event {}".format(i))
+#             for j, track in enumerate(event):
+#                 print("Track {}".format(j))
+#                 print(track)
     
     def __extract_test_output__(self, tracks, tracks_per_event):
         pass
@@ -107,6 +128,8 @@ def main():
     tracker   = LinearTracker()
     dataframe = pd.read_csv(filename)
     tracker.load_dataframe(dataframe)
+    
+    
 # END FUNCTION main
 
 
