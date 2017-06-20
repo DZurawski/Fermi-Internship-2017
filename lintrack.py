@@ -1,137 +1,85 @@
-import collections
+""" lintrack.py
+"""
+
+import random
 import pandas as pd
 import numpy as np
 
-class ProbabilityMatrix():
-    """ A wrapper class to a probability matrix provided by a LinearTracker. """
-    def __init__(self, matrix, track_IDs, hit_IDs):
-        """ Initialize a ProbabilityMatrix.
-            @param matrix - 2-D numpy array: A probability matrix such that
-                each row represents a track, each column represents a hit and
-                an element represents the probability that a hit is a member of
-                track.
-            @param track_IDs - list of ints: The list of all track IDs.
-            @param hit_IDs - list of ints: The list of all hit IDs.
-            @return Nothing
-        """
-        self.matrix  = matrix # The underlying matrix containing probabilities.
-        self.__T2I__ = collections.OrderedDict() # Maps track ID to an index within self.matrix.
-        self.__H2I__ = collections.OrderedDict() # Maps hit ID to an index within self.matrix.
-        
-        for i, track_ID in enumerate(track_IDs):
-            self.__T2I__[i] = track_ID
-        
-        for i, hit_ID in enumerate(hit_IDs):
-            self.__H2I__[i] = hit_ID
-    
-    def probability(self, track_ID, hit_ID):
-        """ Return the probability that the particle with 'hit_ID' is in track with 'track_ID'.
-            @param track_ID - int: A track ID
-            @param hit_ID - int: A hit ID
-            @return float 
-                A probability float within [0, 1].
-        """
-        track_idx = self.__T2I__[track_ID]
-        hit_idx   = self.__H2I__[hit_ID]
-        return self.matrix[track_idx, hit_idx]
-    
-    def probabilities(self, hit_ID):
-        """ Return a list of track ID and a vector of probabilites.
-            @param hit_ID - int: The ID of a particle
-            @return ([int], 1-D numpy array)
-                A list of track ID and a vector of probabilities such that
-                the index of a track ID within the list corresponds to the index
-                of the probability within the probability vector.
-        """
-        hit_idx = self.__H2I__[hit_ID]
-        return (self.__T2I__.keys(), self.matrix[:, hit_idx])
-# END CLASS ProbabilityMatrix
-
 class LinearTracker():
-    """ An object that classifies particles to tracks after an event. """
-    def __init__(self):
+    """ An object that classifies particles to tracks after an event. """    
+    def __init__(self, dataframe, model=None):
         """ Initialize a LinearTracker.
-            @param filename - string: The name of a file to load data from.
-            @param model - keras model - A network model that the tracker will use to
-                classify particles.
+            @param dataframe - pd.DataFrame - used to pick tracks from.
+                The headers should contain: ("id", "z", "r", "phi").
+            @param model - keras model - A network model that the tracker will
+                use to classify particles.
             @return Nothing
         """
-        self.model       = None  # keras model
-        self.dataframe   = None  # pandas DataFrame
-        self.test_input  = None  # list of events. Event is list of tracks. Track is list of position vectors.
-        self.test_output = None  # ???
+        self.model     = model     # keras model to figure out tracks.
+        self.dataframe = dataframe # pandas.DataFrame for picking tracks.
+        self.input     = None      # input to train model on.
+        self.output    = None      # output to train model on.
+    # END function __init__
     
-    def load_dataframe(self, dataframe, tracks_per_event=5):
-        """ Load a data frame to this tracker.
-            @param dataframe - pandas DataFrame - the data frame to load from.
+    def load_data(self, num_events=1,
+                  tracks_per_event=3, track_size=4, noise_per_event=3):
+        """ Load input and output data from this object's dataframe.
+            @param num_events - int - The number of events to generate.
             @param tracks_per_event - int - The number of tracks per event.
+            @param track_size - int - The number of hits per track.
+            @param noise_per_event - int - The number of hits with no track.
             @return Nothing
+                However, self.input and self.output become numpy arrays.
+                self.input is collection of hits of shape:
+                    (num_events, hits_per_event, 3)
+                self.output is list of probability matrices of shape:
+                    (num_events, hits_per_event, tracks_per_event)
         """
-        self.dataframe = dataframe
-        groups = self.dataframe.groupby("id")     # Hits grouped by track ID.
-        tracks = [group[1] for group in groups]   # Track data - list of pd.DataFrame
-        TPE, L = tracks_per_event, len(tracks) # Renames for brevity.
-        events = [tracks[i:i+TPE] for i in range(0, L, TPE)] # Sliced track data
-        self.test_input  = [[track[["z", "phi", "r"]].values for track in event] for event in events]
-        self.test_output = []
+        hits_per_event = (track_size * tracks_per_event) + noise_per_event
+        data   = self.dataframe[["id", "r", "phi", "z"]].drop_duplicates()
+        groups = data.groupby("id")
+        valids = groups.filter(lambda track: len(track) == track_size)
+        bads   = groups.filter(lambda track: len(track) != track_size)
+        labels = ["phi", "r", "z"]
         
-        for event in events:
-            num_hits = sum([len(track) for track in event])
-            matrix   = np.zeros((num_hits, TPE))
+        # Populate input and output with data.
+        self.input  = np.zeros((num_events, hits_per_event, len(labels)))
+        self.output = np.zeros((num_events, hits_per_event, tracks_per_event))
+        for n in range(num_events):
+            # Retrieve the hits within this event.
+            sample = random.sample(list(valids.groupby("id")), tracks_per_event)
+            tracks = [track[1] for track in sample] # Make it not a tuple.
+            noise  = bads.sample(noise_per_event)
+            hits   = pd.concat(tracks + [noise])
+            hits.sort_values(labels, inplace=True)
             
+            # Populate this event's inputs.
+            self.input[n, :] = hits[labels].values
+            
+            # Define a mapping from track ID to probability matrix column.
             T2I = dict()
+            for t, track_ID in enumerate([s[0] for s in sample]):
+                T2I[track_ID] = t
             
-            for i, track in enumerate(event):
-                T2I[track["id"].values[0]] = i
-            
-            hit_idx = 0
-            for i, track in enumerate(event):
-                IDs = track["id"].values
-                for j, ID in enumerate(IDs):
-                    matrix[hit_idx, T2I[ID]] = 1
-                    hit_idx += 1
-            
-            self.test_output.append(matrix)
-        
-#         matrices = []
-#         for event in events:
-#             print(type(event[0]))
-#             matrix = np.zeros()
-#             for track in event:
-#                 IDs     = track[["id"]] # The track id's for each hit.
-#                 uniques = np.unique(IDs) # The unique track id's.
-#                 matrix  = np.zeros((IDs.size, uniques.size)) # The probability matrix.
-#                 print(matrix)
-#                 # Create a way to map track id number to an index in the probability matrix.
-#                 ID2row = dict() 
-#                 for col, ID in enumerate(uniques):
-#                     ID2row[ID] = col
-#                  
-#                 # Populate the probability matrix with 100% certainty values.
-#                 for col, ID in enumerate(IDs):
-#                     matrix[col, ID2row[ID]] = 1
-
-        
-#         for i, event in enumerate(self.test_input):
-#             print("Event {}".format(i))
-#             for j, track in enumerate(event):
-#                 print("Track {}".format(j))
-#                 print(track)
-    
-    def __extract_test_output__(self, tracks, tracks_per_event):
-        pass
+            # Populate this event's outputs.
+            for t, track_ID in enumerate(hits["id"]):
+                index = T2I.get(track_ID)
+                if index is not None:
+                    self.output[n, t, index] = 1
+    # END FUNCTION load_data
 # END CLASS LinearTracker
        
 def main():
     np.random.seed(7)
     filename  = ('file_o_stuff3.csv')
-    tracker   = LinearTracker()
     dataframe = pd.read_csv(filename)
-    tracker.load_dataframe(dataframe)
+    tracker   = LinearTracker(dataframe)
+    tracker.load_data()
     
-    
+    print(tracker.input)
+    print("- - - - -- - - - - - -- - - - - - -")
+    print(tracker.output)
 # END FUNCTION main
-
 
 print("Starting the program.")
 main()
