@@ -1,0 +1,82 @@
+import random
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+class LinearTracker():
+    """ An object that classifies particles to tracks after an event. """    
+    def __init__(self, dataframe, model=None):
+        """ Initialize a LinearTracker.
+            @param dataframe - pd.DataFrame - used to pick tracks from.
+                The headers should contain: ("id", "z", "r", "phi").
+            @param model - keras model - A network model that the tracker will
+                use to classify particles.
+            @return Nothing
+        """
+        self.model     = model     # keras model to figure out tracks.
+        self.dataframe = dataframe # pandas.DataFrame for picking tracks.
+        self.input     = None      # input to train model on.
+        self.output    = None      # output to train model on.
+    # END function __init__
+    
+    def load_data(self, num_events,
+                  tracks_per_event, track_size, noise_per_event):
+        """ Load input and output data from this object's dataframe.
+            @param num_events - int - The number of events to generate.
+            @param tracks_per_event - int - The number of tracks per event.
+            @param track_size - int - The number of hits per track.
+            @param noise_per_event - int - The number of hits with no track.
+            @return Nothing
+                However, self.input and self.output become numpy arrays.
+                self.input is collection of hits of shape:
+                    (num_events, hits_per_event, 3)
+                self.output is list of probability matrices of shape:
+                    (num_events, hits_per_event, tracks_per_event)
+        """
+        hits_per_event = (track_size * tracks_per_event) + noise_per_event
+        data   = self.dataframe[["id", "r", "phi", "z"]].drop_duplicates()
+        groups = data.groupby("id")
+        goods  = groups.filter(lambda track: len(track) == track_size)
+        bads   = groups.filter(lambda track: len(track) != track_size)
+        labels = ["phi", "r", "z"]
+        
+        # Populate input and output with data.
+        goods_group = goods.groupby("id").groups.values
+        self.input  = np.zeros((num_events, hits_per_event, len(labels)))
+        self.output = np.zeros((num_events, hits_per_event, tracks_per_event))
+        for n in range(num_events):
+            # Retrieve a sample of tracks.
+            sample = random.sample(goods_group, tracks_per_event)
+            print(sample)
+            return
+            tracks = [track[1] for track in sample] # Make it not a tuple.
+            valids = pd.concat(tracks).sort_values(labels)
+            
+            # Make a mapping from track ID to index within a prob matrix.
+            L = pd.concat([T.sort_values(["r"]).head(1) for T in tracks])
+            L.sort_values(["phi", "z"], inplace=True)
+            T2I = dict()
+            for idx, hit in enumerate(L["id"]):
+                T2I[hit] = idx
+            
+            # Make some noise hits to add.
+            noise  = bads.sample(noise_per_event)
+            hits   = pd.concat([valids, noise])
+            hits.sort_values(labels, inplace=True)
+            
+            # Populate this event's inputs.
+            self.input[n, :] = hits[labels].values
+            
+            # Populate this event's outputs.
+            for t, track_ID in enumerate(hits["id"]):
+                index = T2I.get(track_ID)
+                if index is not None:
+                    self.output[n, t, index] = 1
+    # END FUNCTION load_data
+# END CLASS LinearTracker
+
+filename  = ('../linear_data_5k.csv')
+dataframe = pd.read_csv(filename)
+tracker   = LinearTracker(dataframe)
+np.random.seed(7)
+tracker.load_data(num_events=1, tracks_per_event=5, track_size=4, noise_per_event=5)
