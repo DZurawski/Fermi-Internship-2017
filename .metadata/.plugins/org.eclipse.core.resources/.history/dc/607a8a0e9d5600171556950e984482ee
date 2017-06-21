@@ -78,7 +78,7 @@ class LinearTracker():
     # END FUNCTION __get_matrix_map__
 # END CLASS LinearTracker
 
-filename  = ('../Data Sets/linear_data_5k.csv')
+filename  = ('../linear_data_5k.csv')
 dataframe = pd.read_csv(filename)
 tracker   = LinearTracker(dataframe)
 np.random.seed(7)
