@@ -82,8 +82,8 @@
             <children xsi:type="basic:PartSashContainer" xmi:id="_fh1hR1gdEeeUgbjI1Qe0Lw" containerData="9000" selectedElement="_fh1hSFgdEeeUgbjI1Qe0Lw">
               <children xsi:type="basic:PartSashContainer" xmi:id="_fh1hSFgdEeeUgbjI1Qe0Lw" containerData="7000" selectedElement="_7L9FoFgiEeeUgbjI1Qe0Lw" horizontal="true">
                 <children xsi:type="basic:PartSashContainer" xmi:id="_7L9FoFgiEeeUgbjI1Qe0Lw" containerData="7000" selectedElement="_fh1hSVgdEeeUgbjI1Qe0Lw">
-                  <children xsi:type="advanced:Placeholder" xmi:id="_fh1hSVgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.editorss" containerData="6361" ref="_fUkhUFgdEeeUgbjI1Qe0Lw"/>
-                  <children xsi:type="basic:PartStack" xmi:id="_7L9FoVgiEeeUgbjI1Qe0Lw" elementId="PartStack@7f45239d" containerData="3639" selectedElement="_fh1hVVgdEeeUgbjI1Qe0Lw">
+                  <children xsi:type="advanced:Placeholder" xmi:id="_fh1hSVgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.editorss" containerData="8454" ref="_fUkhUFgdEeeUgbjI1Qe0Lw"/>
+                  <children xsi:type="basic:PartStack" xmi:id="_7L9FoVgiEeeUgbjI1Qe0Lw" elementId="PartStack@7f45239d" containerData="1546" selectedElement="_fh1hVVgdEeeUgbjI1Qe0Lw">
                     <children xsi:type="advanced:Placeholder" xmi:id="_fh1hVVgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.console.ConsoleView" ref="_fhF6ZVgdEeeUgbjI1Qe0Lw"/>
                   </children>
                 </children>
@@ -134,7 +134,7 @@
         <tags>EditorStack</tags>
         <tags>active</tags>
         <children xsi:type="basic:Part" xmi:id="_r-pAMFgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.e4.ui.compatibility.editor" contributionURI="bundleclass://org.eclipse.ui.workbench/org.eclipse.ui.internal.e4.compatibility.CompatibilityEditor" label="lintrack" iconURI="platform:/plugin/org.python.pydev/icons/python_file.gif" closeable="true">
-          <persistedState key="memento" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xD;&#xA;&lt;editor id=&quot;org.python.pydev.editor.PythonEditor&quot; name=&quot;lintrack.py&quot; partName=&quot;lintrack&quot; title=&quot;lintrack&quot; tooltip=&quot;Linear Tracker Eclipse/lintrack.py&quot;>&#xD;&#xA;&lt;input factoryID=&quot;org.eclipse.ui.part.FileEditorInputFactory&quot; path=&quot;/Linear Tracker Eclipse/lintrack.py&quot;/>&#xD;&#xA;&lt;editorState selectionHorizontalPixel=&quot;0&quot; selectionLength=&quot;0&quot; selectionOffset=&quot;3255&quot; selectionTopPixel=&quot;323&quot;/>&#xD;&#xA;&lt;/editor>"/>
+          <persistedState key="memento" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xD;&#xA;&lt;editor id=&quot;org.python.pydev.editor.PythonEditor&quot; name=&quot;lintrack.py&quot; partName=&quot;lintrack&quot; title=&quot;lintrack&quot; tooltip=&quot;Linear Tracker Eclipse/lintrack.py&quot;>&#xD;&#xA;&lt;input factoryID=&quot;org.eclipse.ui.part.FileEditorInputFactory&quot; path=&quot;/Linear Tracker Eclipse/lintrack.py&quot;/>&#xD;&#xA;&lt;editorState selectionHorizontalPixel=&quot;0&quot; selectionLength=&quot;0&quot; selectionOffset=&quot;4896&quot; selectionTopPixel=&quot;1260&quot;/>&#xD;&#xA;&lt;/editor>"/>
           <tags>Editor</tags>
           <tags>org.python.pydev.editor.PythonEditor</tags>
           <tags>removeOnHide</tags>
@@ -242,7 +242,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_dLtXYFgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.workbench.file">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_dM1YwFgdEeeUgbjI1Qe0Lw" elementId="print" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" enabled="false" command="_YBZ2FFgdEeeUgbjI1Qe0Lw"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_2pX1AFhTEee674pxHTK67g" elementId="print" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/print_edit.png" tooltip="Print" command="_YBZ2FFgdEeeUgbjI1Qe0Lw"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_dLtXYVgdEeeUgbjI1Qe0Lw" elementId="additions" toBeRendered="false">
         <tags>toolbarSeparator</tags>
@@ -269,7 +269,7 @@
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_dLtXZVgdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.workbench.navigate">
         <tags>Draggable</tags>
-        <children xsi:type="menu:HandledToolItem" xmi:id="_dM_Jx1gdEeeUgbjI1Qe0Lw" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_YBQFSFgdEeeUgbjI1Qe0Lw"/>
+        <children xsi:type="menu:HandledToolItem" xmi:id="_2pg-9FhTEee674pxHTK67g" elementId="org.eclipse.ui.window.pinEditor" visible="false" iconURI="platform:/plugin/org.eclipse.ui/icons/full/etool16/pin_editor.png" tooltip="Pin Editor" type="Check" command="_YBQFSFgdEeeUgbjI1Qe0Lw"/>
       </children>
       <children xsi:type="menu:ToolBar" xmi:id="_dLtXZlgdEeeUgbjI1Qe0Lw" elementId="group.editor" toBeRendered="false">
         <tags>toolbarSeparator</tags>
