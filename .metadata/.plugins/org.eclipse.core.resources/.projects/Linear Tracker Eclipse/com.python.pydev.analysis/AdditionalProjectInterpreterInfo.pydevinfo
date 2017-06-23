@@ -1,7 +1,7 @@
 -- VERSION_4
 -- START DISKCACHE_2
 C:\Users\Daniel\Documents\GitHub\Fermi-Internship-2017\.metadata\.plugins\org.eclipse.core.resources\.projects\Linear Tracker Eclipse\com.python.pydev.analysis\v2_indexcache
-lintrack|1498061821207369000|C:\Users\Daniel\Documents\GitHub\Fermi-Internship-2017\Linear Tracker Eclipse\lintrack.py
+lintrack|1498249568085022000|C:\Users\Daniel\Documents\GitHub\Fermi-Internship-2017\Linear Tracker Eclipse\lintrack.py
 -- END DISKCACHE
 -- START DICTIONARY
 4
@@ -18,13 +18,16 @@ lin|1|LinearTracker!9@
 tra|1|tracker!11@
 -- END TREE
 -- START TREE 2
-8
+11
 __g|1|__get_matrix_map__!2&10@
 __i|1|__init__!2&10@
 __p|2|__populate_output__!2&10@__populate_input__!2&10@
+__t|1|__trackify__!2&10@
 dat|1|dataframe!3&11@
 inp|2|input!3&11@input!4&11@
 loa|1|load_data!2&10@
 mod|1|model!3&11@
 out|2|output!3&11@output!4&11@
+plo|1|plot!2&10@
+sho|1|show_losses!2&10@
 -- END TREE
