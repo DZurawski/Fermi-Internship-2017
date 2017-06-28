@@ -1,0 +1,90 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+require("tidyr")
+require("dplyr")
+require("rgl")
+```
+
+```{r}
+events.total <- 2 # The total number of events to generate.
+tracks.total <- 3 # The total number of tracks per event.
+layers       <- c(40, 70, 100, 130) # The layer radiuses.
+hits.total   <- length(layers) * tracks.total # The total number of hits per event.
+z.bounds     <- c(-200, 200) # The minimum and maximum allowable z values.
+hits <- data.frame(event_id=numeric(0), cluster_id=numeric(0), phi=numeric(0), r=numeric(0), z=numeric(0))
+
+for (event_id in seq(1, events.total)) {
+  cluster_id <- (1 : tracks.total)
+  z          <- runif(hits.total, -50, 50)
+  phi        <- runif(hits.total, 0, 2*pi)
+  #eta        <- runif(hits.total, 0, 2*pi)
+  
+  frame <- data.frame(event_id, cluster_id, phi, r=1:tracks.total
+  #hits <- rbind(hits, frame)
+}
+hits[with(hits, order(event_id, cluster_id, r, phi, z))]
+```
+
+```{r}
+### Generate Linear Tracks (OLD WAY) ###
+hits.total  <- 5000
+cluster_id  <- 1 : hits.total
+z           <- runif(hits.total, -50, 50)
+phi         <- runif(hits.total, 0, 2*pi)
+eta         <- runif(hits.total, 0, 2*pi)
+
+hits <- data.frame(cluster_id, z, phi, eta) %>%
+          mutate(z1.40=40/tan(eta), z2.70=70/tan(eta), z25.100=100/tan(eta), z3.130=130/tan(eta)) %>%
+          gather(key=layer, value=zl, z1.40:z3.130) %>%
+          separate(layer, into = c("val", "r"), sep = "\\.") %>%
+          transform(r=as.numeric(r)) %>%
+          mutate(z=z+zl) %>%
+          filter(-200 < z & z < 200)
+          
+# Remove all unnecessary columns.
+hits$eta <- NULL
+hits$val <- NULL
+hits$zl  <- NULL
+hits <- hits[with(hits, order(cluster_id, r)), ]
+rownames(hits) <- NULL
+
+hits
+```
+
+```{r}
+### Save Generated Data to File ###
+filename <- ("standard_linear.csv")
+write.csv(hits, filename, row.names=TRUE)
+```
+
+```{r}
+### Graphing ###
+r<-5
+my.t <- rep(seq(-.2,.2,length.out=100), each=3)
+my.p <- c(0,0,0)
+my.d <- c(40,25,15)
+my.o <- my.p + my.t * my.d
+my.m <- matrix(my.o, ncol=3,byrow=TRUE)
+
+my.a <- my.d[1]^2 + my.d[2]^2 
+my.b <- 2 * my.p[1] * my.d[1] + 2 * my.p[2] * my.p[2]
+my.c <- my.p[1]^2 + my.p[2]^2 - r^2
+
+my.tp <- (-my.b + sqrt(my.b^2 - 4*my.a*my.c)) / (2*my.a) 
+my.tn <- (-my.b - sqrt(my.b^2 - 4*my.a*my.c)) / (2*my.a) 
+
+plot3d(my.m[,1], my.m[,2], my.m[,3])
+my.pos<-(my.p + my.tp * my.d)
+my.neg<-(my.p + my.tn * my.d)
+points3d(my.pos[1],my.pos[2],my.pos[3],col='red')
+points3d(my.neg[1],my.neg[2],my.neg[3],col='red')
+
+th = seq(0,2*pi, length.out=100)
+adj <- r * cos(th)
+opp <- r * sin(th)
+points3d(adj,opp,my.pos[3],col='green')
+points3d(adj,opp,my.neg[3],col='green')
+```
