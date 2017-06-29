@@ -1,0 +1,31 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+require("tidyr")
+require("dplyr")
+```
+
+```{r}
+MeV <- read.csv("public_train_100MeV.csv")
+MeV <- MeV %>% mutate(phi=atan2(y, x)) %>%
+               mutate(z=0*cluster_id)
+
+names(MeV)[names(MeV) == "layer"] <- "r"
+
+MeV$layer <- NULL
+MeV$x     <- NULL
+MeV$y     <- NULL
+MeV$iphi  <- NULL
+MeV <- MeV[with(MeV, order(event_id, cluster_id, r)), ]
+rownames(MeV) <- NULL
+MeV
+```
+
+```{r}
+### Save Generated Data to File ###
+filename <- ("standard_100MeV.csv")
+write.csv(MeV, filename, row.names=TRUE)
+```
