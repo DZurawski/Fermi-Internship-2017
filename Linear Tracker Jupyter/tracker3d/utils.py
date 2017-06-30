@@ -283,7 +283,9 @@ def print_metrics(train, target, prediction, verbose=True):
 ### END FUNCTION print_metrics
 
 def discrete_matrix(self, probMat):
-    """Take a probability matrix and output a discrete output matrix"""
+    """Take a probability matrix and output a discrete output matrix
+    Arguments:
+    probMat(numpy.array) an ouput matrix from the model"""
     disOut = np.zeros(probMat.shape)
     oneInd = from_categorical(probMat)
     disOut[oneInd] = 1
