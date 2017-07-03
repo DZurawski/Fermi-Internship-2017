@@ -7,7 +7,7 @@ This file contains loading functions to generate or retrieve training data from
 
 import numpy as np
 import pandas as pd
-from keras.utils import to_categorical
+from tracker3d.utils import to_categorical
 
 # Suppress FutureWarnings about np.full function.
 import warnings
@@ -16,7 +16,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # How to sort hits. Sort by "phi" first, then by "r" and finally by "z".
 ORDERING  = ["phi", "r", "z"]
 
-def dataload(frame, nev, tpe, ts, npe, verbose=True):
+def dataload(frame, nev, tpe, ts, npe, z_bounds=(-200,200), verbose=False):
     """ Load input and output data from 'frame'.
     
     Arguments:
@@ -47,32 +47,33 @@ def dataload(frame, nev, tpe, ts, npe, verbose=True):
             target is a numpy array of shape: (nev, ts*tpe+npe, tpe+1)
     """
     hpe    = (tpe * ts) + npe # Hits per event.
-    train  = np.zeros((nev, hpe, len(ORDERING)))
-    target = np.zeros((nev, hpe, tpe+1))
+    train  = np.zeros((nev, hpe, len(ORDERING))) # Will be returned later.
+    target = np.zeros((nev, hpe, tpe+1)) # Will be returned later
     layers = np.sort(np.partition(pd.unique(frame.r), ts-1)[:ts])
     hits   = frame[frame.r.isin(layers)]
-    events = [event for (_, event)in hits.groupby("event_id")][:nev]
+    events = [event for (_, event)in hits.groupby("event_id")]
     
+    wins = 0 # The number of successful event extractions.
     for i, event in enumerate(events):
+        if wins >= nev:
+            break
         try:
             goods = event.groupby("cluster_id").filter(lambda t: len(t) == ts)
             goods = goods.sort_values("cluster_id")[:ts * tpe]
-            noise = _make_some_noise(npe, (-200, 200), layers, tpe)
+            noise = _make_some_noise(npe, z_bounds, layers, tpe)
             lowlr = goods[goods.r == layers[0]].sort_values(ORDERING)
             ID2I  = dict((ID, i) for i, ID in enumerate(lowlr.cluster_id))
             goods.cluster_id = goods.cluster_id.map(ID2I)
-            ehits     = pd.concat([goods, noise]).sort_values(ORDERING)
-            train[i]  = ehits[ORDERING].values
-            target[i] = to_categorical(ehits["cluster_id"].values, tpe + 1)
-        except ValueError as ve:
-            if (verbose):
-                print("Bad mojo at event index {}!".format(i))
-                print(ve)
-                print("Dan's Note: This is probably occurring because there")
-                print("are not enough clusters with enough hits in them. Some")
-                print("clusters do not have a layer 0 hit, and so they will not")
-                print("have enough hits.")
-    return (train, target)
+            ehits        = pd.concat([goods, noise]).sort_values(ORDERING)
+            train[wins]  = ehits[ORDERING].values
+            target[wins] = to_categorical(ehits["cluster_id"].values, tpe + 1)            
+            wins += 1
+        except ValueError:
+            if verbose:
+                print("Failed reading event index {}.".format(i))
+    if verbose:
+        print("All finished. Loaded in {0} / {1}".format(wins, nev))
+    return (train[:wins], target[:wins])
 ### END FUNCTION dataload
 
 def _make_some_noise(npe, z_bounds, layers, cluster_id):
