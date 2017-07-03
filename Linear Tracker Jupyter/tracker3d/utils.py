@@ -203,7 +203,7 @@ def display_side_by_side(train, target, predictions=None):
     Returns:
         None
     """
-    print("Displaying the first {} inputs and outputs.".format(maximum))
+#    print("Displaying the first {} inputs and outputs.".format(maximum))
     print("Input shape:  {}".format(train.shape))
     print("Output shape: {}".format(target.shape))
 
@@ -215,11 +215,13 @@ def display_side_by_side(train, target, predictions=None):
     df_list  = []   
     df_list.append(input_frames)
     df_list.append(output_frames)
+    
     if predictions is not None:
         print("Prediction shape: {}".format(predictions.shape))
-        prediction_frames = pd.DataFrame(data=predictions, columns=target_cols)
+        prediction_frames = pd.DataFrame(data=predictions.round(2), columns=target_cols)
         df_list.append(prediction_frames)
-    
+
+        
     multi_column_df_display(df_list, cols=3 if predictions is not None else 2)
 ### END FUNCTION display_side_by_side
 
@@ -282,20 +284,21 @@ def print_metrics(train, target, prediction, verbose=True):
     return (false_negative + false_positive + wrong_category != 0)
 ### END FUNCTION print_metrics
 
-def discrete_matrix(self, probMat):
+def discrete_matrix(probMat):
     """Take a probability matrix and output a discrete output matrix
     Arguments:
     probMat(numpy.array) an ouput matrix from the model"""
     disOut = np.zeros(probMat.shape)
     oneInd = from_categorical(probMat)
-    disOut[oneInd] = 1
+    for i, row in enumerate(disOut):
+        row[oneInd[i]] = 1
     return disOut
 ###END FUNCTION discrete_matrix
 
-def number_hits_per_track(self, event, verbose=True):
+def number_hits_per_track(event, verbose=True):
     """Takes an event and returns the number of hits per track in that event"""
     disEvent = discrete_matrix(event)
-    nhpt = np.sum(disEvent, axis=1)
+    nhpt = disEvent.sum(axis=0)
     if verbose:
         for i, num in enumerate(nhpt[:-1]):
             print("The number of hits in the {0} track is: {1}".format(i+1, num))
@@ -303,17 +306,54 @@ def number_hits_per_track(self, event, verbose=True):
     return nhpt
 ### END function number_hits_per_track
 
-def probability_hits_per_track(self, output, trackNum, propnhpt):
+def probability_hits_per_track(output, trackNum, propnhpt):
     """Takes a set of probability output matrices and returns the percent of 
     tracks with the correct number of hits"""
     correct = 0
     for i, event in enumerate(output):
         nhpt = number_hits_per_track(event, verbose=False)
-        if nhpt[trackNum] == propnhpt:
+        if nhpt[trackNum-1] == propnhpt:
             correct += 1
+    print("Number correct: {}".format(correct))
     percentCor = correct/(len(output))
     return percentCor
 ###END function probability_hits_per_track
+
+def discrete_accuracy(event, target, train, verbose=True):
+    disEvent = discrete_matrix(event)
+    acc = 0
+    flag = False
+    for i, hit in enumerate(disEvent):
+        acc = acc + np.count_nonzero(np.equal(np.argmax(hit), np.argmax(target[i])))
+        if (any(np.equal(hit, target[i])==False)):
+            if verbose:
+                print("The wrong hit is in row:", i)
+                flag = True
+    percentAcc = acc/(target.shape[0])
+    if verbose:
+        print("The accuracy is: {}".format(percentAcc))
+        if flag:
+            display_side_by_side(train, target, event)
+            plot3D(train, from_categorical(target))
+            plot3D(train, from_categorical(disEvent))
+    return percentAcc
+###END function discrete_accuracy
+
+def discrete_accuracy_all(predictions, target, train):
+    acc = 0
+    for i, event in enumerate(predictions):
+        acc = acc + discrete_accuracy(event, target[i], train[i], verbose=False)
+    totalAcc = acc/(len(predictions))
+    return totalAcc
+###END function discrete_accuracy_all
+
+def check_and_diag(predictions, target, train):
+    for i, event in enumerate(predictions):
+        print("The event number is: {}".format(i+1))
+        discrete_accuracy(event, target[i], train[i])
+    totalAcc = discrete_accuracy_all(predictions, target, train)
+    print("The overall accuracy is: {}".format(totalAcc))
+    
 
 def _to_cartesian(hit):
     """ Transform the hit (phi, r, z) tuple into cartesian coordinates. """
