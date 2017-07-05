@@ -66,7 +66,7 @@ def dataload(frame, nev, tpe, ts, npe, z_bounds=(-200,200), verbose=False):
             goods.cluster_id = goods.cluster_id.map(ID2I)
             ehits        = pd.concat([goods, noise]).sort_values(ORDERING)
             train[wins]  = ehits[ORDERING].values
-            target[wins] = to_categorical(ehits["cluster_id"].values, tpe + 1)            
+            target[wins] = to_categorical(ehits["cluster_id"].values.astype(np.uint), tpe + 1)            
             wins += 1
         except ValueError:
             if verbose:
@@ -107,26 +107,28 @@ def var_dataload(frame, nev, tpe, ts, npe, z_bounds=(-200,200), verbose=False):
             target is a numpy array of shape: (nev, ts*tpe+npe, tpe+1)
     """
     hpe    = (tpe * ts) + npe # Hits per event.
-    train  = np.zeros((nev, hpe, len(ORDERING))) # Will be returned later.
-    target = np.zeros((nev, hpe, tpe+1)) # Will be returned later
+    train  = [] # Will be returned later.
+    target = [] # Will be returned later
     layers = np.sort(np.partition(pd.unique(frame.r), ts-1)[:ts])
     hits   = frame[frame.r.isin(layers)]
     events = [event for (_, event)in hits.groupby("event_id")]
-    
+
     wins = 0 # The number of successful event extractions.
     for i, event in enumerate(events):
         if wins >= nev:
             break
         try:
             goods = event.groupby("cluster_id").filter(lambda t: len(t) <= ts)
-            goods = goods.sort_values("cluster_id")[:ts * tpe]
+            IDs = np.unique(goods["cluster_id"].values)
+            uniqueIDs = np.array([ID for ID in IDs if ID < tpe])
+            goods = goods[goods.cluster_id.isin(uniqueIDs)]
             noise = _make_some_noise(npe, z_bounds, layers, tpe)
             lowlr = goods[goods.r == layers[0]].sort_values(ORDERING)
             ID2I  = dict((ID, i) for i, ID in enumerate(lowlr.cluster_id))
             goods.cluster_id = goods.cluster_id.map(ID2I)
             ehits        = pd.concat([goods, noise]).sort_values(ORDERING)
-            train[wins]  = ehits[ORDERING].values
-            target[wins] = to_categorical(ehits["cluster_id"].values, tpe + 1)            
+            train.append(ehits[ORDERING].values)
+            target.append(to_categorical(ehits["cluster_id"].values.astype(np.uint), tpe + 1))
             wins += 1
         except ValueError:
             if verbose:

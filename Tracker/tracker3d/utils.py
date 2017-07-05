@@ -193,7 +193,7 @@ def to_categorical(IDs, columns):
     """
     matrix = np.zeros((len(IDs), columns))
     for i, ID in enumerate(IDs):
-        matrix[i, ID] = 1
+        matrix[i][ID] = 1
     return matrix
 
 def from_categorical(matrix):
@@ -283,6 +283,7 @@ def display_side_by_side(train, target, predictions=None):
         print("Prediction shape: {}".format(predictions.shape))
         prediction_frames = pd.DataFrame(data=predictions.round(2), columns=target_cols)
         df_list.append(prediction_frames)
+    multi_column_df_display(df_list, len(df_list))
 ### END FUNCTION display_side_by_side
 
 def print_scores(model, train, target, batch_size):
