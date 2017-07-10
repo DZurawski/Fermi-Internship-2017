@@ -1,0 +1,21 @@
+This is the datasets folder.
+Here, small testing data sets are stored.
+If you would like to see how the data sets were generated, the R code can be found
+in the genRator folder.
+
+"public_train_100MeV.csv"
+	The RAMP data set. Note that this data set was generated and not actually
+	data from real physics collisions.
+"standard_100MeV.csv"
+	A standardized version of the RAMP data set. Originally, the RAMP data set
+	consisted of many columns and redundant information. The standardized version,
+	"standard_100MeV.csv", consists of just 5 rows:
+	(event_id, cluster_id, phi, r, z)
+	Note that the z value is always 0, so that the 2D characteristic of the original
+	data set is maintained.
+"standard_curves100MeV.csv"
+	This is the standardized version of the Ramp data set, but for each track, the
+	z value slopes up or down linearly.
+"standard_linear.csv"
+	This data set consists only of linear tracks (tracks that do not curve).
+	This set was generated and not actually data from real physics collisions.
