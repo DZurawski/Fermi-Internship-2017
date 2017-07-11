@@ -39,8 +39,8 @@ def plot3d(hits: Event,
 
     Returns: (None)
     """
-    maxsize = 100  # The maximum size a point can take.
-    minsize = 25   # The minimum size a point can take.
+    maxsize = 50  # The maximum size a point can take.
+    minsize = 10  # The minimum size a point can take.
 
     # Set up the information regarding track identification.
     ids   = from_categorical(probs)
@@ -68,7 +68,7 @@ def plot3d(hits: Event,
     _hit_info_display_text = None
 
     # Define a function to display info on a hit if the user clicks on it.
-    def _on_pick(event) -> None:
+    def _on_pick_hit(event) -> None:
         global _hit_info_display_text
         edx    = event.ind
         artist = event.artist
@@ -98,7 +98,7 @@ def plot3d(hits: Event,
                    s=sizes[i],
                    picker=True,
                    depthshade=False)
-    fig.canvas.mpl_connect('pick_event', _on_pick)
+    fig.canvas.mpl_connect('pick_event', _on_pick_hit)
     plt.legend()
     plt.show(ax)
     
@@ -217,6 +217,8 @@ def multi_column_df_display(list_dfs: Sequence[pd.DataFrame],
     Code by David Medenjak responding to StackOverflow question found here:
     https://stackoverflow.com/questions/38783027/jupyter-notebook-display-
     two-pandas-tables-side-by-side
+
+    Code has been edited to apply better to this module.
     
     Arguments:
         list_dfs (list):
@@ -226,19 +228,15 @@ def multi_column_df_display(list_dfs: Sequence[pd.DataFrame],
     
     Returns: (None)
     """
-    html_table = "<table style='width:100%; border:0px'>{content}</table>"
-    html_row   = "<tr style='border:0px'>{content}</tr>"
-    html_cell  = ("<td style='width:{width}%;vertical-align:top;border:0px'>"
-                  "{{content}}</td>")
-    html_cell = html_cell.format(width=100/cols)
-    cells  = [html_cell.format(content=df.to_html()) for df in list_dfs]
-    cells += (cols - (len(list_dfs) % cols)) * [html_cell.format(content="")]
-    rows = [html_row.format(
-            content="".join(cells[i:i+cols]))
-            for i in range(0, len(cells), cols)]
-    ipd  = IPython.display
-    html = ipd.HTML(html_table.format(content="".join(rows)))
-    ipd.display(html)
+    html_table = "<table style='border:10px'>{content}</table>"
+    html_row   = "<tr style='border:10px'>{content}</tr>"
+    html_cell  = "<td style='border:10px'>{content}</td>"
+    cells      = [html_cell.format(content=df.to_html()) for df in list_dfs]
+    rows       = [html_row.format(content="".join(cells[i:i+cols]))
+                  for i in range(0, len(cells), cols)]
+    ipydisplay = IPython.display
+    all_html   = ipydisplay.HTML(html_table.format(content="".join(rows)))
+    ipydisplay.display(all_html)
 
 
 def display_side_by_side(train: Event,
@@ -264,14 +262,16 @@ def display_side_by_side(train: Event,
     target_cols = ["T{}".format(i) for i in range(target.shape[1])]
 
     input_frames  = pd.DataFrame(data=train, columns=order)
-    output_frames = pd.DataFrame(data=target.round(2), columns=target_cols)
+    output_frames = (pd.DataFrame(data=target.round(2), columns=target_cols)
+                     .replace(0, ""))
 
     df_list = [input_frames, output_frames]
     
     if predictions is not None:
         print("Prediction shape: {}".format(predictions.shape))
-        prediction_frames = pd.DataFrame(data=predictions.round(2),
-                                         columns=target_cols)
+        prediction_frames = (pd.DataFrame(data=predictions.round(2),
+                                          columns=target_cols)
+                             .replace(0.00, ""))
         df_list.append(prediction_frames)
         
     multi_column_df_display(df_list, len(df_list))

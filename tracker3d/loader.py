@@ -78,11 +78,13 @@ def from_frame(frame: pd.DataFrame,
         is used as the 'padding' category, which is used to designate a
         padding row as padding.
     """
-    order  = list(order)  # Will absolutely need *order* to be a list.
-    train  = []  # Will be returned after it is populated later.
-    target = []  # Will be returned after it is populated later.
+    order  = list(order)  # Will absolutely need *order* to be a list for pd.
+    train  = []  # Will contain hit position arrays.
+    target = []  # Will contain target probability matrices.
 
-    # *layers* is an array of valid r values that hits can have.
+    # *layers* is an array of unique valid r values that hits can have.
+    # Valid r values are the lowest *ts* number of r values.
+    # If *ts* > (number of layers), then *layers* is all unique layers.
     layers = _get_lowest_uniques(frame.r, ts)
 
     # *hits* is a pd.DataFrame where rows contain hit info for a some hit.
@@ -94,9 +96,9 @@ def from_frame(frame: pd.DataFrame,
     # The number of successful event extractions.
     wins = 0
 
-    # Adjust tpe for *tpe* that are too large.
+    # Adjust *tpe* for *tpe* that are too large.
     if variable_data:
-        tpe = min(tpe, max(frame.groupby(["event_id", "cluster_id"]).size()))
+        tpe = min(tpe, max(frame.groupby(["event_id", "r"]).size()))
 
     # Function to be used to filter out the tracks with unwanted track size.
     def good_len(track: pd.DataFrame) -> bool:
@@ -104,6 +106,7 @@ def from_frame(frame: pd.DataFrame,
                 and (((len(track) <= ts) and variable_data)
                      or ((len(track) == ts) and not variable_data)))
 
+    # Time to populate the *train* and *target* lists.
     for i, event in enumerate(events):
         if nev <= wins:
             break  # We have enough successful event extractions. Time to go.
@@ -120,28 +123,17 @@ def from_frame(frame: pd.DataFrame,
             sortie = goods.sort_values(order)
             tracks = sortie.cluster_id
             train.append(sortie[order].values)
-            target.append(to_categorical(tracks.values, tpe + 1))
+            target.append(to_categorical(tracks.values, tpe + 1)) # +1 for pad
             wins += 1
         except ValueError:
             if verbose:
                 print("Failed reading event index {}.".format(i))
+    if verbose:
+        print("All finished. Loaded in {0} / {1}".format(wins, nev))
 
     # Pad the sequences to allow for variable number of hits per event
     # and variable number of tracks per event.
-    train  = train[:wins]
-    target = target[:wins]
-    train  = pad_sequences(train,  padding="post", value=0.0, dtype=np.float32)
-    target = pad_sequences(target, padding="post", value=0,   dtype=np.int32)
-
-    # The final column in target is the "padding" category. For each padding
-    # that we added, assign the column in its row to 1.
-    for matrix in target:
-        for row in matrix:
-            if np.sum(row) == 0:
-                row[-1] = 1
-    if verbose:
-        print("All finished. Loaded in {0} / {1}".format(wins, nev))
-    return train, target
+    return _padded_train_and_target(train[:wins], target[:wins])
 
 
 def to_file(train: Train,
@@ -246,3 +238,34 @@ def _assign_cluster_id_to_matrix_index(frame: pd.DataFrame,
     low_r = frame[frame.r == min_r].sort_values(order)
     id2i  = dict((_id, i) for i, _id in enumerate(low_r.cluster_id))
     frame.cluster_id = frame.cluster_id.map(id2i)
+
+
+def _padded_train_and_target(train: Train,
+                             target: Target)\
+        -> Tuple[Train, Target]:
+    """ Pad *train* and *target*. Return the padded Train and Target.
+
+    Pad *train* and *target* such that each Event in *train* has the same
+    number of rows and eac PMatrix in *target* has the same number of rows.
+    The padded rows in the returned PMatrix's will have 1's in the final
+    column, where this column represents the padding category.
+
+    Arguments:
+        train (Train):
+            training data to be padded.
+        target (Target):
+            target data to be padded.
+
+    Return: (Tuple[Train, Target])
+        The padded Train and Target data.
+    """
+    p_train  = pad_sequences(train, padding="post", value=0, dtype=np.float32)
+    p_target = pad_sequences(target, padding="post", value=0, dtype=np.int32)
+
+    # The final column in target is the "padding" category. For each padding
+    # that we added, assign the column in its row to 1.
+    for matrix in p_target:
+        for row in matrix:
+            if np.sum(row) == 0:
+                row[-1] = 1
+    return p_train, p_target
