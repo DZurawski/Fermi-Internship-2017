@@ -39,9 +39,11 @@ def wrong_classifications(target: PMatrix,
     Returns (int):
         The number of incorrect classifications.
     """
-    wrong_category = 0
+    wrong_category = 0  # The number of wrong classifications.
+
+    # Iterate through the prediction rows and find wrong classifications.
     for j, row in enumerate(prediction):
-        predict = np.argmax(row)
+        predict = np.argmax(row)  # The prediction for this row.
         answer  = np.argmax(target[j])
         if predict != answer:
             if verbose:
@@ -183,6 +185,8 @@ def discrete_accuracy(event: Event,
 
     display_plots_and_tables = False  # If anything goes wrong, flips to True.
     discrete = discretize(prediction)
+
+    # Time to calculate the accuracy
     accuracy = 0
     for i, row in enumerate(discrete):
         equivalent = np.equal(np.argmax(row), np.argmax(target[i]))
@@ -190,7 +194,7 @@ def discrete_accuracy(event: Event,
         if verbose and not equivalent:
             print("Wrong hit in row: {}".format(i))
             display_plots_and_tables = True
-    percent = accuracy / len(target)
+    percent = accuracy / len(target)  # The percent correct.
     if verbose:
         print("The accuracy is: {}".format(percent))
         if display_plots_and_tables:
@@ -202,7 +206,7 @@ def discrete_accuracy(event: Event,
 def discrete_accuracy_all(train: Train,
                           predictions: Target,
                           targets: Target,
-                          padding: bool=False)\
+                          padding: bool=True)\
         -> float:
     """ Return the average discrete accuracy.
 
@@ -224,11 +228,19 @@ def discrete_accuracy_all(train: Train,
     Returns: (float)
         Average discrete accuracy
     """
-    length   = len(predictions)
-    accuracy = sum([discrete_accuracy(train[i],   predictions[i],
-                                      targets[i], padding=padding)
-                    for i in range(length)])
-    return accuracy / length
+    zero     = np.zeros(train.shape[2])
+    accuracy = 0
+    count    = 0
+    for i, event in enumerate(train):
+        discrete = discretize(predictions[i])
+        for j, hit in enumerate(event):
+            if padding and np.all(np.equal(hit, zero)):
+                # Skip padding events.
+                continue
+            else:
+                accuracy += np.all(np.equal(discrete[j], targets[i][j]))
+                count    += 1
+    return accuracy / count
 
 
 def print_discrete_metrics(train: Train,

@@ -11,8 +11,8 @@ Grammar: Python 3.6.1
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, Sequence, List
-from .tracker_types import Train, Target
+from typing import Tuple, Sequence, List, Optional
+from .tracker_types import Train, Target, Event, PMatrix
 from .utils import to_categorical
 from keras.preprocessing.sequence import pad_sequences
 from scipy.sparse import csr_matrix
@@ -21,10 +21,12 @@ from scipy.sparse import csr_matrix
 def from_frame(frame: pd.DataFrame,
                nev: int,  # "Number of Events"
                tpe: int,  # "Tracks Per Event"
-               ts: int,  # "Track Size"
+               ts: int,   # "Track Size"
                variable_data: bool=False,
                order: Sequence[str]= ("phi", "r", "z"),
-               verbose: bool=True)\
+               verbose: bool=True,
+               preferred_size: Tuple[Optional[int],
+                                     Optional[int]]=(None, None))\
         -> Tuple[Train, Target]:
     """ Load input and output data from *frame*.
 
@@ -67,6 +69,11 @@ def from_frame(frame: pd.DataFrame,
             The order in which hits should be arranged.
         verbose (bool):
             If True, print failures to standard out. Else, do not.
+        preferred_size (Tuple[Optional[int], Optional[int]]):
+            1: The number of rows in all events.
+                Padding with zero entries will be
+                used to ensure all events have the same number of rows.
+            2: The number of tracks per event.
 
     Returns: (Tuple[Train, Target])
         Train  : np.array, shape(nev, (ts * tpe + npe), len(order))
@@ -106,7 +113,7 @@ def from_frame(frame: pd.DataFrame,
                 and (((len(track) <= ts) and variable_data)
                      or ((len(track) == ts) and not variable_data)))
 
-    # Time to populate the *train* and *target* lists.
+    # It is time to populate the *train* and *target* lists.
     for i, event in enumerate(events):
         if nev <= wins:
             break  # We have enough successful event extractions. Time to go.
@@ -123,7 +130,14 @@ def from_frame(frame: pd.DataFrame,
             sortie = goods.sort_values(order)
             tracks = sortie.cluster_id
             train.append(sortie[order].values)
-            target.append(to_categorical(tracks.values, tpe + 1)) # +1 for pad
+            if preferred_size[1] is not None:
+                target.append(to_categorical(
+                        tracks.values,
+                        preferred_size[1]))
+            else:
+                target.append(to_categorical(
+                        tracks.values,
+                        tpe + 1))  # +1 for padding category.
             wins += 1
         except ValueError:
             if verbose:
@@ -133,7 +147,10 @@ def from_frame(frame: pd.DataFrame,
 
     # Pad the sequences to allow for variable number of hits per event
     # and variable number of tracks per event.
-    return _padded_train_and_target(train[:wins], target[:wins])
+    return _padded_train_and_target(
+            train[:wins],
+            target[:wins],
+            preferred_size[0])
 
 
 def to_file(train: Train,
@@ -151,9 +168,8 @@ def to_file(train: Train,
         filename (str):
             The name of the file to save to.
         sparse (bool):
-            True if target matrices should be saved in csr format.
-            This format saves a great deal of space for matrices with many
-            zero entries.
+            True if target matrices should be saved in csr format. This format
+            saves a great deal of space for matrices with many zero entries.
             False if you just want to save the target as a regular matrix.
 
     Returns: (None)
@@ -240,8 +256,9 @@ def _assign_cluster_id_to_matrix_index(frame: pd.DataFrame,
     frame.cluster_id = frame.cluster_id.map(id2i)
 
 
-def _padded_train_and_target(train: Train,
-                             target: Target)\
+def _padded_train_and_target(train: Sequence[Event],
+                             target: Sequence[PMatrix],
+                             preferred_size: int)\
         -> Tuple[Train, Target]:
     """ Pad *train* and *target*. Return the padded Train and Target.
 
@@ -259,8 +276,18 @@ def _padded_train_and_target(train: Train,
     Return: (Tuple[Train, Target])
         The padded Train and Target data.
     """
-    p_train  = pad_sequences(train, padding="post", value=0, dtype=np.float32)
-    p_target = pad_sequences(target, padding="post", value=0, dtype=np.int32)
+    p_train  = pad_sequences(
+            train,
+            padding="post",
+            maxlen=preferred_size,
+            value=0,
+            dtype=np.float32)
+    p_target = pad_sequences(
+            target,
+            padding="post",
+            maxlen=preferred_size,
+            value=0,
+            dtype=np.int32)
 
     # The final column in target is the "padding" category. For each padding
     # that we added, assign the column in its row to 1.
@@ -268,4 +295,5 @@ def _padded_train_and_target(train: Train,
         for row in matrix:
             if np.sum(row) == 0:
                 row[-1] = 1
+
     return p_train, p_target
