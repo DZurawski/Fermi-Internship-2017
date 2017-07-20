@@ -19,17 +19,34 @@ in the genRator folder.
 	This is the standardized version of the Ramp data set, but for each track, the
 	z value slopes up or down linearly.
 
-"standard_linear.csv"
-	This data set consists only of linear tracks (tracks that do not curve).
-	This set was generated and not actually data from real physics collisions.
-
-"uniform_train.csv"
+"uniform_train_without_z.csv"
 	This data set consists of generated data in the form of the RAMP data set.
 	It is NOT the RAMP data set, but its columns and organization are similar.
-	It consists of (24 * 160 = 3840) events.
-	For each number n from 1 to 24, there are 160 events with n tracks.
+	It consists of (25 * 160 = 4000) events.
+	For each number n from 1 to 25, there are 160 events with n tracks.
 	Each track consists of up to 9 hits. Not all tracks are the same length.
 
 "uniform_train_with_z.csv"
 	This is the standardized "uniform_train.csv" data set, but for each track,
-	the z value slopes up or down linearly.
+	the z value slopes up or down linearly. The slope was determined by uniform
+	randomly selecting a slope for each track.
+
+"ramp_zpr_n10.npz"
+	A file containing two numpy arrays.
+	The first numpy array consists of training events from the
+	"standard_curves100MeV.csv" data set. Data is organized according to
+	z, phi, r. Hence, the *zpr* tag within the file name.
+	The second numpy array consists of target probability matrices from the
+	"standard_curves100MeV.csv" data set.
+	For each event, there are 10 noisy hits (hits that belong to no track).
+	Hence, the tag *n10* within the file name.
+
+"unif_zpr_n10.npz"
+	A file containing two numpy arrays.
+	The first numpy array consists of training events from the
+	"uniform_train_with_z.csv" data set. Data is organized according to
+	z, phi, r. Hence, the *zpr* tag within the file name.
+	The second numpy array consists of target probability matrices from the
+	"uniform_train_with_z.csv" data set.
+	For each event, there are 10 noisy hits (hits that belong to no track).
+	Hence, the tag *n10* within the file name.

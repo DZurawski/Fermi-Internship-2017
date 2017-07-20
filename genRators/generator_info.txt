@@ -3,9 +3,20 @@ Here are R files that either generate completely new data or modify existing dat
 "add_z_to_100MeV.R"
 	Given the public_train_100MeV.csv data set found in the datasets folder,
 	save a new data set with linear sloping z values.
+
 "create_linear_data.R"
 	Create a large number of events containing linear tracks (tracks that do not
 	curve).
+
 "standardize_100MeV.R"
 	Create a new data set from public_train_100MeV.csv with the exact same data,
 	but in a standardized format: 5 columns, (event_id, column_id, phi, r, z).
+
+"uniform_data_generator.py"
+	A python script that generates uniform track/event data.
+	Events generated have a uniform distribution of track sizes.
+    	So, for example, if you wanted 300 events with a max track size of 10,
+    	then there would be 30 events with just one track, 30 events with two
+    	tracks, ..., and 30 events with 10 tracks.
+	Adapted from "ModelAndData.py" file within seq2seq folder provided by
+	Aris T.

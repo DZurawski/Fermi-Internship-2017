@@ -22,9 +22,19 @@ def plot3d(hits: Event,
            target: Optional[PMatrix]=None,
            order: Tuple[str]=("phi", "r", "z"),
            title: str="",
+           padding: bool=True,
+           has_noise: bool=True,
            flat_ax: Optional[str]=None)\
         -> Any:
     """ Display a 3D plot of hits.
+
+    If flat_ax is None (indicating to plot in 3d), then you can perform these
+    actions on the plot.
+        1. Click on a hit to display information about it.
+        2. Click on a track node to highlight that track.
+        3. Press the spacebar to toggle layer cylinders.
+
+    These actions have not been implemented for the 2d plots.
 
     Arguments:
         hits (Sequence[Hit]):
@@ -34,12 +44,17 @@ def plot3d(hits: Event,
         target: (PMatrix):
             The actual probability matrix that describes the true tracks that
             each hit belongs to.
-        order: (Tuple[str])
+        order: (Tuple[str]):
             The ordering of phi, r, z for a hit.
-        title: (str)
+        title: (str):
             The title of this plot.
+        padding: (bool)
+            If True, then don't show the last track column. If padding was
+            included in the event, the last track column is the padding column.
         flat_ax: Optional[str])
             The axis to flatten if you want to plot 2 dimensions. None if 3d.
+        has_noise (bool):
+            True if there is a noise column in the PMatrices.
 
     Returns: Plot3D
         WARNING!!!!
@@ -48,9 +63,25 @@ def plot3d(hits: Event,
         more than one time.
     """
     if target is None:
-        plot = Plot3D(hits, prediction, prediction, order, flat_ax)
+        plot = Plot3D(
+                hits,
+                prediction,
+                prediction,
+                order,
+                flat_ax,
+                padding,
+                has_noise
+        )
     else:
-        plot = Plot3D(hits, prediction, target, order, flat_ax)
+        plot = Plot3D(
+                hits,
+                prediction,
+                target,
+                order,
+                flat_ax,
+                padding,
+                has_noise
+        )
     plot.plot(title)
     return plot  # Please assign this to something after function.
     
@@ -263,7 +294,9 @@ class Plot3D:
                  pred: PMatrix,
                  target: PMatrix,
                  order: Tuple[str] = ("phi", "r", "z"),
-                 flat_ax: Optional[str]=None)\
+                 flat_ax: Optional[str]=None,
+                 padding: bool=True,
+                 has_noise: bool=True)\
             -> None:
         """ Initialize a Plot3D.
 
@@ -276,26 +309,33 @@ class Plot3D:
                 A target probability matrix.
             order (Tuple[str]):
                 The order that hits in an event are in.
+            padding (bool):
+                True if plot should not show last column (pad column).
+            has_noise (bool):
+                If this target matrix has a noise column, then True.
 
         Returns: (None)
         """
         self.display_text = None
 
-        self.ids     = from_categorical(pred)
-        self.act_ids = from_categorical(target)
-        self.probs   = from_categorical_prob(pred)
+        self.ids     = from_categorical(pred)  # List of cluster ids.
+        self.act_ids = from_categorical(target)  # List of actual ids.
+        self.probs   = from_categorical_prob(pred)  # List of probabilities.
+        self.padding = padding  # True if plot should ignore last track.
+        self.cylinders = []  # Storage area for layer cylinder displays.
 
-        self.num_ids = len(self.ids)
-        self.tracks  = [[] for _ in range(self.num_ids)]
-
+        self.num_ids = len(self.ids)  # Number of ids.
+        self.tracks  = [[] for _ in range(self.num_ids)]  # List of tracks.
+        self.radius  = np.unique(event[:, order.index("r")])  # Unique radiuses.
         self.pos2idx = dict()  # Position to index dictionary.
         self.idx2col = dict()  # Index to collection dictionary
         self.col2col = dict()  # Legend PathCollection to Plot PathCollection.
 
-        self.flat_ax = flat_ax
-        self.fig     = plt.figure()
+        self.flat_ax = flat_ax  # Which axis to flatten in 2d display.
+        self.fig     = plt.figure()  # Plot figure.
         self.leg     = None  # Plot legend.
-        self.collection = None
+        self.collection = None  # Current collection that is selected by user.
+        self.has_noise  = has_noise
 
         # If flat_ax is not None, then the plot will be 2-dimensional.
         if self.flat_ax is None:
@@ -315,8 +355,10 @@ class Plot3D:
 
         # Grab a mapping from track id to actual track length.
         unique, counts = np.unique(self.act_ids, return_counts=True)
-        self.track_len = dict(zip(unique, counts))
-        self.func_reference = None  # Reference to pick event function
+        self.id2count = dict(zip(unique, counts))
+        self.func_reference = []  # Reference to event functions
+
+        self.cylinder_toggle_button = " "
 
     def plot(self, title: str=None)\
             -> None:
@@ -330,12 +372,13 @@ class Plot3D:
         """
         # Add the tracks to the plot.
         legend_index = 0  # The index for a legend handle.
+        zeros = np.zeros(3)
         for i in range(self.num_ids):
             if not self.tracks[i]:
                 # Don't display empty tracks.
                 continue
             track = np.array(self.tracks[i])
-            if np.all(np.equal(track[0], np.array([0, 0, 0]))):
+            if self.padding and np.all(np.equal(track[0], zeros)):
                 # Don't display padding sequences.
                 continue
             else:
@@ -352,15 +395,33 @@ class Plot3D:
             handle.set_picker(5)
             self.col2col[handle] = self.idx2col[i]
 
-        if self.flat_ax is None:
-            self.func_reference = self._on_pick  # So gc does not eat func.
-            self.fig.canvas.mpl_connect('pick_event', self.func_reference)
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
 
         if self.flat_ax is None:
+            self.ax.set_zlabel("Z")
+            self.func_reference.append(self._on_pick)  # So gc does not eat it.
+            self.func_reference.append(self._toggle_cylinders)
+            self.fig.canvas.mpl_connect('pick_event',
+                                        self.func_reference[0])
+            self.fig.canvas.mpl_connect('key_press_event',
+                                        self.func_reference[1])
             self.ax.set_xlim3d(-1000, 1000)
             self.ax.set_ylim3d(-1000, 1000)
             self.ax.set_zlim3d(-200, 200)
+        elif self.flat_ax == "z":
+            for r in self.radius:
+                self.ax.add_artist(
+                        plt.Circle(
+                                (0, 0),
+                                r,
+                                color='black',
+                                fill=False,
+                                linestyle='-',
+                                alpha=0.1))
 
+        if self.has_noise:
+            self.leg.get_texts()[-1].set_text("Noise")
         self.ax.set_title(title)
         plt.show(self.ax)
 
@@ -402,11 +463,12 @@ class Plot3D:
         if self.collection != new_collection:
             # If there is new collection, highlight it.
             self.collection = self.col2col[event.artist]
-            pos  = np.array(self.collection._offsets3d)
-            t_count = self.track_len.get(self.pos2idx.get(tuple(pos[:3, 0])))
-            text = "Track Length: {0}\nActual Length: {1}".format(
-                    pos.shape[1],
-                    t_count)
+            pos     = np.array(self.collection._offsets3d)
+            index   = self.pos2idx.get(tuple(pos[:3, 0]))
+            t_count = self.id2count.get(self.act_ids[index])
+            text    = "Track Length: {0}\nActual Length: {1}".format(
+                            pos.shape[1],
+                            t_count)
             self.collection._edgecolor3d = np.array([[0.8, 0.8, 0, .8]])
             self.collection.set_linewidth(10)
         else:
@@ -432,10 +494,10 @@ class Plot3D:
         artist = event.artist
         pos    = tuple(np.array(artist._offsets3d)[0:3, edx])
         hdx    = self.pos2idx[pos]
-        text   = ("Hit: {0}, Track: {1}, Certainty: {2}\nActual Track: {3}"
+        text   = ("Hit: {0}, Track: {1}, Certainty: {2:.1f}%\nActual Track: {3}"
                   .format(hdx,
                           self.ids[hdx],
-                          self.probs[hdx],
+                          self.probs[hdx] * 100,
                           self.act_ids[hdx]))
         if self.display_text is not None:
             self.display_text.remove()
@@ -496,3 +558,64 @@ class Plot3D:
                 linewidth=1,
                 edgecolor='black',
         )
+
+    def _plot_cylinder(self, r: float)\
+            -> None:
+        """ Plot a cylinder centered at (0, 0, 0) with radius *r*.
+
+        The cylinder circles around the z axis.
+
+        Arguments:
+            r (float):
+                The radius of the cylinder.
+
+        Returns: (None)
+        """
+        xc, zc = np.meshgrid(
+                np.linspace(-r, r, 25),
+                np.linspace(-100, 100, 25))
+        yc = np.sqrt(r**2 - xc ** 2)
+        rstride = 20
+        cstride = 20
+        color = 'blue'
+        self.cylinders.append(self.ax.plot_surface(
+                xc,
+                yc,
+                zc,
+                alpha=.1,
+                color=color,
+                rstride=rstride,
+                cstride=cstride
+        ))
+        self.cylinders.append(self.ax.plot_surface(
+                xc,
+                -yc,
+                zc,
+                alpha=.1,
+                color=color,
+                rstride=rstride,
+                cstride=cstride
+        ))
+
+    def _toggle_cylinders(self, event)\
+            -> None:
+        """ Toggle display of cylinders on or off.
+
+        If the user presses spacebar, cylinders are toggled on or off. These
+        cylinders represent the layers of the collider.
+
+        Arguments:
+            event:
+                An event from matplotlib.
+
+        Returns: (None)
+        """
+        if event.key == self.cylinder_toggle_button:
+            if not self.cylinders:
+                for r in self.radius:
+                    self._plot_cylinder(r)
+            else:
+                for cylinder in self.cylinders:
+                    cylinder.remove()
+                self.cylinders = []
+            self.fig.canvas.draw()

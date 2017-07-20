@@ -25,14 +25,20 @@ def from_frame(frame: pd.DataFrame,
                variable_data: bool=False,
                order: Sequence[str]= ("phi", "r", "z"),
                verbose: bool=True,
-               preferred_size: Tuple[Optional[int],
-                                     Optional[int]]=(None, None))\
+               n_noise: int=0,
+               preferred_rows: Optional[int]=None,
+               preferred_tracks: Optional[int]=None)\
         -> Tuple[Train, Target]:
     """ Load input and output data from *frame*.
 
     Each event returned has the same number of tracks and each track has the
     same number of corresponding hits. If variable_data is True, then some of
-    these hits will be padding: (0, 0, 0) entries.
+    these hits will be padding: (0, 0, 0) entries. The last column in the
+    Target's PMatrix's correspond to the padding category.
+
+    If *n_noise* is greater than 0, then each Event in the Train input data will
+    have *n_noise* number of noisy hits. Noisy hits belong to no track. The
+    second to last column in the PMatrix's correspond to the noise category.
 
     Arguments:
         frame (pd.DataFrame):
@@ -54,36 +60,43 @@ def from_frame(frame: pd.DataFrame,
             "Tracks per Event" -- How many tracks belong to each event.
             If *variable_data* is True, then *tpe* is the upper limit for
             how many tracks belong to each event. Otherwise, all events
-            have the same number of tracks assigned to them.
+            have the same number of tracks (*tpe*) assigned to them.
         ts (int):
             "Track Size" -- The number of hits that belong to each track.
             If *variable_data* is True, then *ts* is the upper limit for
             how many hits belong to each track. Otherwise, all tracks have
-            the same number of hits assigned to them.
+            the same number of hits (*ts*) assigned to them.
         variable_data (bool):
             True if we want to load in events with less tracks than *tpe*
                     and tracks with less hits than *ts*.
             False if we want all events to have the same number of tracks
                     and all tracks to have the same number of hits.
         order (Tuple[str]):
-            The order in which hits should be arranged.
+            The order in which hits should be arranged. It should be some
+            permutation of ("phi", "r", "z").
         verbose (bool):
-            If True, print failures to standard out. Else, do not.
-        preferred_size (Tuple[Optional[int], Optional[int]]):
-            1: The number of rows in all events.
-                Padding with zero entries will be
-                used to ensure all events have the same number of rows.
-            2: The number of tracks per event.
+            If True, the the function will print failures to standard out.
+            If False, the function will not print anything.
+        n_noise (int):
+            How much noise to add per event. This should be non-negative.
+        preferred_rows (Optional[int]):
+            The number of rows in all events. Padding with zero entries will be
+            used to ensure all events have the same number of rows.
+        preferred_tracks (Optional[int]):
+            The number of tracks per event. If not specified, defaults to max
+            tracks per event among all events. If you decide to specify this,
+            remember to add enough columns to accommodate the noise category
+            and the padding category!
 
     Returns: (Tuple[Train, Target])
-        Train  : np.array, shape(nev, (ts * tpe + npe), len(order))
-        Target : np.array, shape(nev, (ts * tpe + npe),        tpe)
+        Train  : np.array with 3 dimensions.
+            shape = (number of loaded-in events, hits per event, 3)
+        Target : np.array with 3 dimensions.
+            shape = (number of loaded-in events, hits per event, categories)
         If *variable_data* is True, then each Event in Train will be padded
         with rows of 0's at the end so that each Event is the same shape.
-        Also, each PMatrix in Target will consist of (n + 1) columns,
-        where n is the max number of tracks in any event. The final column
-        is used as the 'padding' category, which is used to designate a
-        padding row as padding.
+        Also, each PMatrix in Target will consist of (n + 2) columns,
+        where n is the max number of tracks in any event.
     """
     order  = list(order)  # Will absolutely need *order* to be a list for pd.
     train  = []  # Will contain hit position arrays.
@@ -122,22 +135,17 @@ def from_frame(frame: pd.DataFrame,
             goods = event.groupby("cluster_id").filter(good_len)
             ids   = _get_lowest_uniques(goods.cluster_id, tpe)
             goods = goods[goods.cluster_id.isin(ids)]
+            n_cat = tpe + 2 if preferred_tracks is None else preferred_tracks
+            noise = _make_noise(n_noise, goods, n_cat)
 
             # Adjust each cluster_id to an index within a probability matrix.
             _assign_cluster_id_to_matrix_index(goods, order, layers[0])
 
             # Finally, append this event to the list of trains and targets.
-            sortie = goods.sort_values(order)
+            sortie = pd.concat([goods, noise]).sort_values(order)
             tracks = sortie.cluster_id
             train.append(sortie[order].values)
-            if preferred_size[1] is not None:
-                target.append(to_categorical(
-                        tracks.values,
-                        preferred_size[1]))
-            else:
-                target.append(to_categorical(
-                        tracks.values,
-                        tpe + 1))  # +1 for padding category.
+            target.append(to_categorical(tracks.values, n_cat))
             wins += 1
         except ValueError:
             if verbose:
@@ -150,7 +158,7 @@ def from_frame(frame: pd.DataFrame,
     return _padded_train_and_target(
             train[:wins],
             target[:wins],
-            preferred_size[0])
+            preferred_rows)
 
 
 def to_file(train: Train,
@@ -297,3 +305,48 @@ def _padded_train_and_target(train: Sequence[Event],
                 row[-1] = 1
 
     return p_train, p_target
+
+
+def _make_noise(n_noise: int,
+                goods: pd.DataFrame,
+                n_cat: int)\
+        -> pd.DataFrame:
+    """ Create a pd.DataFrame containing noisy hits.
+
+    Noise is defined as a hit belonging to no track. Noise is generated by
+    generating 3 aspects: *r*, *phi*, *z*.
+
+    Generating *r*:
+    For each noisy hit to be generated for the *goods* frame, create a list of
+    all radiuses within *goods* and then uniform randomly choose one of these
+    radiuses to be this particular noisy hit's radius.
+
+    Generating *phi*:
+    Uniform randomly choose a float between -pi and pi.
+
+    Generating *z*:
+    For *goods*, retrieve the minimum and maximum *z* values achieved by all
+    of that event's hits. Uniform randomly choose a float between the
+    minimum *z* and maximum *z*.
+
+    Arguments:
+        n_noise (int):
+            Number of noise hits to generate.
+        goods (pd.DataFrame):
+            The frame of data to generate the data for.
+        n_cat (int):
+            The number of categories for this frame.
+
+    Returns: (pd.DataFrame)
+    """
+    if n_noise < 1:
+        return pd.DataFrame()
+    rnge = range(n_noise)
+    zbd  = (goods["z"].min(), goods["z"].max())  # Z bounds.
+    return pd.DataFrame(data={
+        "event_id": [-1 for _ in rnge],
+        "cluster_id": tuple(n_cat - 2 for _ in rnge),
+        "r": tuple(goods["r"].sample(n_noise, replace=True)),
+        "phi": tuple(2 * np.pi * np.random.random() - np.pi for _ in rnge),
+        "z": tuple((zbd[1]-zbd[0]) * np.random.random() + zbd[0] for _ in rnge)
+    })

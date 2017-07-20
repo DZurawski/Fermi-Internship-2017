@@ -1,0 +1,40 @@
+# add_z_to_100MeV.R
+# Author: Daniel Zurawski
+# Modify the RAMP data set found in "public_train_100MeV.csv" by adding a
+# linear-slope z component.
+# Save a dataframe with columns (event_id, cluster_id, r, phi, z).
+
+require("tidyr")
+require("dplyr")
+
+in_filename   <- "../datasets/tester.csv"
+out_filename  <- "../datasets/tester_z.csv"
+z.bounds      <- c(-200, 200) # What should the min and max z values be?
+initial.frame <- read.csv(in_filename) %>%
+                    mutate(phi = atan2(y, x)) %>%                
+                    mutate(r = round(sqrt(x * x + y * y), 6))
+r.max         <- max(initial.frame$r)
+eta.bounds    <- c(atan(r.max / z.bounds[1] - pi),
+                   atan(r.max / z.bounds[1]),
+                   atan(r.max / z.bounds[2]),
+                   atan(r.max / z.bounds[2] + pi))
+
+stopifnot(eta.bounds[1] < eta.bounds[2]) # runif doesn't work correctly
+stopifnot(eta.bounds[3] < eta.bounds[4]) # if these conditions are false.
+
+initial.frame <-initial.frame %>%
+    group_by(event_id, cluster_id) %>%
+    mutate(eta = sample(c(runif(1, eta.bounds[1], eta.bounds[2]),
+                          runif(1, eta.bounds[3], eta.bounds[4])), 1)) %>%
+    ungroup() %>%
+    mutate(z = ((r) / tan(eta))) %>%
+    arrange(event_id, cluster_id, layer) %>%
+    select(event_id, cluster_id, r, phi, z)
+
+write.csv(
+    initial.frame,
+    out_filename,
+    row.names = TRUE
+)
+
+print(sort(unique(initial.frame$r)))
