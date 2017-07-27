@@ -7,17 +7,17 @@
 require("tidyr")
 require("dplyr")
 
-in_filename   <- "../datasets/tester.csv"
-out_filename  <- "../datasets/tester_z.csv"
+in_filename   <- "../datasets/public_train_100MeV.csv"
+out_filename  <- "../datasets/standard_curves100MeV.csv"
 z.bounds      <- c(-200, 200) # What should the min and max z values be?
 initial.frame <- read.csv(in_filename) %>%
                     mutate(phi = atan2(y, x)) %>%                
                     mutate(r = round(sqrt(x * x + y * y), 6))
 r.max         <- max(initial.frame$r)
-eta.bounds    <- c(atan(r.max / z.bounds[1] - pi),
+eta.bounds    <- c(atan(r.max / z.bounds[1] - 12 * pi),
                    atan(r.max / z.bounds[1]),
                    atan(r.max / z.bounds[2]),
-                   atan(r.max / z.bounds[2] + pi))
+                   atan(r.max / z.bounds[2] + 12 * pi))
 
 stopifnot(eta.bounds[1] < eta.bounds[2]) # runif doesn't work correctly
 stopifnot(eta.bounds[3] < eta.bounds[4]) # if these conditions are false.
@@ -38,3 +38,5 @@ write.csv(
 )
 
 print(sort(unique(initial.frame$r)))
+print(min(abs(initial.frame$z)))
+print(max(abs(initial.frame$z)))

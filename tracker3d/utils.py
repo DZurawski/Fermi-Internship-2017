@@ -20,7 +20,7 @@ from .tracker_types import Event, PMatrix, Hit, Train, Target
 def plot3d(hits: Event,
            prediction: PMatrix,
            target: Optional[PMatrix]=None,
-           order: Tuple[str]=("phi", "r", "z"),
+           order: Tuple[str, str, str]=("phi", "r", "z"),
            title: str="",
            padding: bool=True,
            has_noise: bool=True,
@@ -44,7 +44,7 @@ def plot3d(hits: Event,
         target: (PMatrix):
             The actual probability matrix that describes the true tracks that
             each hit belongs to.
-        order: (Tuple[str]):
+        order: (Tuple[str, str, str]):
             The ordering of phi, r, z for a hit.
         title: (str):
             The title of this plot.
@@ -211,24 +211,27 @@ def multi_column_df_display(list_dfs: Sequence[pd.DataFrame],
     
     Returns: (None)
     """
-    html_table = "<table style='border:10px'>{content}</table>"
-    html_row   = "<tr style='border:10px'>{content}</tr>"
-    html_cell  = "<td style='border:10px'>{content}</td>"
-    cells      = [html_cell.format(content=df.to_html()) for df in list_dfs]
-    rows       = [html_row.format(content="".join(cells[i:i+cols]))
+    style      = "border:10px white-space:nowrap"
+    html_table = "<table style={style}>{content}</table>"
+    html_row   = "<tr style={style}>{content}</tr>"
+    html_cell  = "<td nowrap='nowrap' style={style}>{content}</td>"
+    cells      = [html_cell.format(content=df.to_html(), style=style)
+                  for df in list_dfs]
+    rows       = [html_row.format(content="".join(cells[i:i+cols]), style=style)
                   for i in range(0, len(cells), cols)]
-    ipydisplay = IPython.display
-    all_html   = ipydisplay.HTML(html_table.format(content="".join(rows)))
-    ipydisplay.display(all_html)
+    ipd        = IPython.display
+    all_html   = ipd.HTML(html_table.format(content="".join(rows), style=style))
+    ipd.display(all_html)
 
 
 def display_side_by_side(train: Event,
                          target: PMatrix,
-                         predictions: Optional[PMatrix]=None,
-                         order: Sequence[str]=("phi", "r", "z"))\
+                         predictions: Optional[PMatrix] = None,
+                         order: Sequence[str] = ("phi", "r", "z"),
+                         display: str = None) \
         -> None:
     """ Display an event of train, target and predictions data on IPython.
-    
+
     Arguments:
         train (Event):
             The training data to display.
@@ -238,21 +241,42 @@ def display_side_by_side(train: Event,
             A PMatrix matrix of predicted probabilities.
         order (Sequence[str]):
             An ordering for the Hit frame's labels.
-    
+        display (optional str):
+            A parameter to check how to display the data.
+            "together" displays the target and prediction matrices within the
+            same cell, separated by and underscore. Target on left,
+            prediction on right.
+            "subtract" displays the difference between target and prediction.
+            Otherwise, display the prediction table after the target table.
+
     Returns: (None)
     """
-    order = list(order)
+    if display == "together" and predictions is not None:
+        output = [["({0})_({1})".format(
+                target[i, j].round(2),
+                predictions[i, j].round(2)
+        )
+            for j in range(target.shape[1])]
+            for i in range(target.shape[0])]
+    elif display == "subtract" and predictions is not None:
+        output = np.subtract(target, predictions).round(2)
+    else:
+        output = target.round(2)
+
     target_cols = ["T{}".format(i) for i in range(target.shape[1])]
+    order = list(order)
 
     # Create pandas frames from the input data.
     input_frames  = pd.DataFrame(data=train, columns=order)
-    output_frames = (pd.DataFrame(data=target.round(2), columns=target_cols)
-                     .replace(0, ""))
+    output_frames = (pd.DataFrame(data=output, columns=target_cols)
+                     .replace(0, "")
+                     .replace("(0)_(0)", "")
+                     .replace("(0.00)_(0.00)", ""))
 
     df_list = [input_frames, output_frames]
 
     # If predictions was specified, add it to the data frame list *df_list*.
-    if predictions is not None:
+    if predictions is not None and display is None:
         print("Prediction shape: {}".format(predictions.shape))
         prediction_frames = (pd.DataFrame(data=predictions.round(2),
                                           columns=target_cols)
@@ -287,13 +311,87 @@ def print_scores(model: Any,
     print("Test Accuracy: {}".format(acc))
 
 
+def number_of_tracks(matrix: PMatrix,
+                     has_padding: bool=True,
+                     has_noise: bool=True)\
+        -> int:
+    """ Return the number of tracks in this matrix.
+
+    Arguments:
+        matrix (PMatrix):
+            The probability matrix that we will use to count the number of
+            tracks.
+        has_padding (bool):
+            If True, then we will not consider the final column, which is, by
+            convention, the padding column.
+        has_noise (bool):
+            If  True, then we will not consider the final column, which is, by
+            convention, the noise column. If has_padding is True, then we will
+            not count the second-to-last column, which is then the noise column.
+
+    Returns: (int)
+        The number of tracks in this matrix.
+    """
+    limit = matrix.shape[1] - has_padding - has_noise
+    return sum([sum(c) > 0 for c in matrix.transpose()[:limit]])
+
+
+def number_of_hits(event: Event) -> int:
+    """ Return the number of hits in this event.
+
+    Arguments:
+        event (Event):
+            Some array of hits.
+
+    Returns (int)
+    """
+    return sum(event != np.zeros(event.shape[1]))
+
+
+def remove_padding_event(event: Event) -> Event:
+    """ Remove the zeros padding rows from the event.
+
+    Arguments:
+        event (Event):
+            The array of hits.
+
+    Returns: (Event)
+        A copy of *event* but without any padding rows.
+    """
+    return event[np.any(event != 0, axis=1)]
+
+
+def remove_padding_matrix(matrix: PMatrix) -> PMatrix:
+    """ Remove the padding column and padding rows from *matrix*.
+
+    Arguments:
+        matrix (PMatrix):
+            A probability matrix.
+
+    Returns: (PMatrix)
+        A copy of the probability matrix, but without a padding column or any
+        padding rows.
+    """
+    return matrix[:, :-1][np.any(matrix[:, :-1] != 0, axis=1)]
+
+
 class Plot3D:
-    """ A 3D plot displaying an event. """
+    """ A 3D plot displaying an event.
+
+    It can display 2d and 3d plots for an event. If you want a 2d plot,
+    specify a flat_ax (flat axis) when initializing the Plot3D.
+
+    You can click on hits within the plot to display information about it.
+    You can also click on track legend icons to highlight that particular
+    track.
+
+    If you are plotting in 3d, press the space bar to toggle radial cylinders.
+    """
     def __init__(self,
                  event: Event,
                  pred: PMatrix,
                  target: PMatrix,
-                 order: Tuple[str] = ("phi", "r", "z"),
+                 order: Tuple[str, str, str] = ("phi", "r", "z"),
                  flat_ax: Optional[str]=None,
                  padding: bool=True,
                  has_noise: bool=True)\
@@ -307,8 +405,13 @@ class Plot3D:
                 A prediction probability matrix.
             target (PMatrix):
                 A target probability matrix.
-            order (Tuple[str]):
+            order (Tuple[str, str, str]):
                 The order that hits in an event are in.
+            flat_ax (Optional[str]):
+                Which axis to flatten for 2d plots. Valid entries are:
+                "z", "r", "y", "x", None.
+                If None, then plot 3d.
+                If "r", plot radius versus z.
             padding (bool):
                 True if plot should not show last column (pad column).
             has_noise (bool):
@@ -316,49 +419,44 @@ class Plot3D:
 
         Returns: (None)
         """
+        if padding:
+            event  = remove_padding_event(event)
+            target = remove_padding_matrix(target)
+            pred   = remove_padding_matrix(pred)
+
+        self.ids       = from_categorical(pred)  # List of cluster ids.
+        self.act_ids   = from_categorical(target)  # List of actual ids.
+        self.probs     = from_categorical_prob(pred)  # List of probabilities.
+
+        self.cylinders = []  # Storage area for layer cylinder displays.
+        self.num_ids   = len(self.ids)  # Number of ids.
+        self.tracks    = [[] for _ in range(self.num_ids)]  # List of tracks.
+        self.radius    = np.unique(event[:, order.index("r")])  # Unique radii
+
+        self.pos2idx   = dict()  # Position to index dictionary.
+        self.idx2col   = dict()  # Index to collection dictionary
+        self.col2col   = dict()  # Legend PathCollection to Plot PathCollection.
+        self.id2count  = dict(zip(*np.unique(self.act_ids, return_counts=True)))
+        self.flat_ax   = flat_ax  # Which axis to flatten in 2d display.
+        self.fig       = plt.figure()  # Plot figure.
+        self.leg       = None  # Plot legend.
+
+        self.collection   = None  # Current collection that is selected by user.
+        self.has_noise    = has_noise
         self.display_text = None
 
-        self.ids     = from_categorical(pred)  # List of cluster ids.
-        self.act_ids = from_categorical(target)  # List of actual ids.
-        self.probs   = from_categorical_prob(pred)  # List of probabilities.
-        self.padding = padding  # True if plot should ignore last track.
-        self.cylinders = []  # Storage area for layer cylinder displays.
-
-        self.num_ids = len(self.ids)  # Number of ids.
-        self.tracks  = [[] for _ in range(self.num_ids)]  # List of tracks.
-        self.radius  = np.unique(event[:, order.index("r")])  # Unique radiuses.
-        self.pos2idx = dict()  # Position to index dictionary.
-        self.idx2col = dict()  # Index to collection dictionary
-        self.col2col = dict()  # Legend PathCollection to Plot PathCollection.
-
-        self.flat_ax = flat_ax  # Which axis to flatten in 2d display.
-        self.fig     = plt.figure()  # Plot figure.
-        self.leg     = None  # Plot legend.
-        self.collection = None  # Current collection that is selected by user.
-        self.has_noise  = has_noise
+        self.func_reference = []  # Reference to event functions
+        self.cylinder_toggle_button = " "  # Space bar to toggle cylinders.
 
         # If flat_ax is not None, then the plot will be 2-dimensional.
-        if self.flat_ax is None:
-            self.ax = Axes3D(self.fig)
-        else:
-            self.ax = plt.subplot(111)
+        self.ax = Axes3D(self.fig) if self.flat_ax is None else plt.subplot(111)
 
         # Extract the cartesian coordinates from the input cylindrical ones.
-        self.hits = np.apply_along_axis(
-                lambda x: self._to_cartesian(x, order=order),
-                1, event)
+        def xyz_func(x):
+            return self._to_cartesian(x, order=order)
+        self.hits = np.apply_along_axis(xyz_func, 1, event)
 
-        # Assign hits to tracks and positions to *self.hits* indices.
-        for idx, ID in enumerate(self.ids):
-            self.tracks[ID].append(self.hits[idx])
-            self.pos2idx[tuple(self.hits[idx])] = idx
-
-        # Grab a mapping from track id to actual track length.
-        unique, counts = np.unique(self.act_ids, return_counts=True)
-        self.id2count = dict(zip(unique, counts))
-        self.func_reference = []  # Reference to event functions
-
-        self.cylinder_toggle_button = " "
+        self._initialize_dictionary_assignments()
 
     def plot(self, title: str=None)\
             -> None:
@@ -372,16 +470,9 @@ class Plot3D:
         """
         # Add the tracks to the plot.
         legend_index = 0  # The index for a legend handle.
-        zeros = np.zeros(3)
         for i in range(self.num_ids):
-            if not self.tracks[i]:
-                # Don't display empty tracks.
-                continue
-            track = np.array(self.tracks[i])
-            if self.padding and np.all(np.equal(track[0], zeros)):
-                # Don't display padding sequences.
-                continue
-            else:
+            if self.tracks[i]:
+                track = np.array(self.tracks[i])
                 # We are all fine. Let's plot this track.
                 if self.flat_ax is None:
                     self._plot3d(track, legend_index)
@@ -395,15 +486,17 @@ class Plot3D:
             handle.set_picker(5)
             self.col2col[handle] = self.idx2col[i]
 
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
+        self._set_plot_labels()
+
+        self.func_reference.append(self._on_pick)  # So gc does not eat it.
+        self.fig.canvas.mpl_connect('pick_event',
+                                    self.func_reference[0])
 
         if self.flat_ax is None:
             self.ax.set_zlabel("Z")
-            self.func_reference.append(self._on_pick)  # So gc does not eat it.
+
             self.func_reference.append(self._toggle_cylinders)
-            self.fig.canvas.mpl_connect('pick_event',
-                                        self.func_reference[0])
+
             self.fig.canvas.mpl_connect('key_press_event',
                                         self.func_reference[1])
             self.ax.set_xlim3d(-1000, 1000)
@@ -419,6 +512,9 @@ class Plot3D:
                                 fill=False,
                                 linestyle='-',
                                 alpha=0.1))
+        elif self.flat_ax == "r":
+            for r in self.radius:
+                self.ax.plot([-200, 200], [r, r], alpha=0.1, color="blue")
 
         if self.has_noise:
             self.leg.get_texts()[-1].set_text("Noise")
@@ -456,30 +552,10 @@ class Plot3D:
 
         Returns: (None)
         """
-        if self.collection is not None:
-            # Make previous collection go back to un-highlighted.
-            self.collection._edgecolor3d = np.array([[0, 0, 0, 1]])
-            self.collection.set_linewidth(1)
-        if self.collection != new_collection:
-            # If there is new collection, highlight it.
-            self.collection = self.col2col[event.artist]
-            pos     = np.array(self.collection._offsets3d)
-            index   = self.pos2idx.get(tuple(pos[:3, 0]))
-            t_count = self.id2count.get(self.act_ids[index])
-            text    = "Track Length: {0}\nActual Length: {1}".format(
-                            pos.shape[1],
-                            t_count)
-            self.collection._edgecolor3d = np.array([[0.8, 0.8, 0, .8]])
-            self.collection.set_linewidth(10)
+        if self.flat_ax is not None:
+            self._on_pick_legend_2d(event, new_collection)
         else:
-            # Just un-highlight the previous one. No new collection.
-            text = ""
-            self.collection = None
-
-        if self.display_text is not None:
-            self.display_text.remove()
-        self.display_text = self.ax.text2D(0.1, 0.8, text,
-                                           transform=self.ax.transAxes)
+            self._on_pick_legend_3d(event, new_collection)
 
     def _on_pick_hit(self, event)\
             -> None:
@@ -492,17 +568,17 @@ class Plot3D:
         """
         edx    = event.ind[0]
         artist = event.artist
-        pos    = tuple(np.array(artist._offsets3d)[0:3, edx])
+        if self.flat_ax is not None:
+            pos = tuple(artist.get_offsets()[0])
+        else:
+            pos = tuple(np.array(artist._offsets3d)[0:3, edx])
         hdx    = self.pos2idx[pos]
         text   = ("Hit: {0}, Track: {1}, Certainty: {2:.1f}%\nActual Track: {3}"
                   .format(hdx,
                           self.ids[hdx],
                           self.probs[hdx] * 100,
                           self.act_ids[hdx]))
-        if self.display_text is not None:
-            self.display_text.remove()
-        self.display_text = self.ax.text2D(0.1, 0.8, text,
-                                           transform=self.ax.transAxes)
+        self._set_display_text(text)
 
     @staticmethod
     def _to_cartesian(hit: Hit,
@@ -548,10 +624,13 @@ class Plot3D:
             x, y = track[:, 1], track[:, 2]
         elif self.flat_ax == "y":
             x, y = track[:, 0], track[:, 2]
+        elif self.flat_ax == "r":
+            x = track[:, 2]
+            y = np.round(np.sqrt(track[:, 0]**2 + track[:, 1]**2), 3)
         else:
             x, y = track[:, 0], track[:, 1]
         self.idx2col[i] = self.ax.scatter(
-                x=x, y=y,
+                x, y,
                 label="T{}".format(i),
                 picker=True,
                 s=50,
@@ -619,3 +698,91 @@ class Plot3D:
                     cylinder.remove()
                 self.cylinders = []
             self.fig.canvas.draw()
+
+    def _on_pick_legend_3d(self, event, new_collection):
+        if self.collection is not None:
+            # Make previous collection go back to un-highlighted.
+            self.collection._edgecolor3d = np.array([[0, 0, 0, 1]])
+            self.collection.set_linewidth(1)
+        if self.collection != new_collection:
+            # If there is new collection, highlight it.
+            self.collection = self.col2col[event.artist]
+            pos     = np.array(self.collection._offsets3d)
+            index   = self.pos2idx.get(tuple(pos[:3, 0]))
+            t_count = self.id2count.get(self.act_ids[index])
+            text    = "Track Length: {0}\nActual Length: {1}".format(
+                            pos.shape[1],
+                            t_count)
+            self.collection._edgecolor3d = np.array([[0.8, 0.8, 0, .8]])
+            self.collection.set_linewidth(10)
+        else:
+            # Just un-highlight the previous one. No new collection.
+            text = ""
+            self.collection = None
+        self._set_display_text(text)
+
+    def _on_pick_legend_2d(self, event, new_collection):
+        if self.collection is not None:
+            # Make previous collection go back to un-highlighted.
+            self.collection.set_edgecolor(np.array([[0, 0, 0, 1]]))
+            self.collection.set_linewidth(1)
+        if self.collection != new_collection:
+            # If there is new collection, highlight it.
+            self.collection = self.col2col[event.artist]
+            pos     = self.collection.get_offsets()
+            index   = self.pos2idx.get(tuple(pos[0]))
+            t_count = self.id2count.get(self.act_ids[index])
+            text    = ("Track Length: {}".format(pos.shape[0])
+                       + "\nActual Length: {}".format(t_count))
+            self.collection.set_edgecolor(np.array([[0.8, 0.8, 0, .8]]))
+            self.collection.set_linewidth(10)
+        else:
+            # Just un-highlight the previous one. No new collection.
+            text = ""
+            self.collection = None
+        self._set_display_text(text)
+
+    def _set_display_text(self, text):
+        t_form = self.ax.transAxes
+        if self.display_text is not None:
+            self.display_text.remove()
+        if self.flat_ax is not None:
+            self.display_text = self.ax.text(0.05, 0.9, text, transform=t_form)
+        else:
+            self.display_text = self.ax.text2D(0.1, 0.8, text, transform=t_form)
+
+    def _set_plot_labels(self):
+        if self.flat_ax == "x":
+            self.ax.set_xlabel("Y")
+            self.ax.set_ylabel("Z")
+        elif self.flat_ax == "y":
+            self.ax.set_xlabel("X")
+            self.ax.set_ylabel("Z")
+        elif self.flat_ax == "r":
+            self.ax.set_xlabel("Z")
+            self.ax.set_ylabel("R")
+        else:
+            self.ax.set_xlabel("X")
+            self.ax.set_ylabel("Y")
+
+    def _initialize_dictionary_assignments(self):
+        # Assign hits to tracks and positions to *self.hits* indices.
+        for idx, ID in enumerate(self.ids):
+            self.tracks[ID].append(self.hits[idx])
+            if self.flat_ax == "z":
+                self.pos2idx[tuple(self.hits[idx][:2])] = idx
+            elif self.flat_ax == "y":
+                self.pos2idx[tuple([
+                    self.hits[idx][0],
+                    self.hits[idx][2]
+                ])] = idx
+            elif self.flat_ax == "x":
+                self.pos2idx[tuple(self.hits[idx][1:])] = idx
+            elif self.flat_ax == "r":
+                self.pos2idx[tuple([
+                    self.hits[idx][2],
+                    np.round(np.sqrt(
+                            self.hits[idx][0] ** 2 + self.hits[idx][1] ** 2), 3)
+                ])] = idx
+            else:
+                self.pos2idx[tuple(self.hits[idx])] = idx

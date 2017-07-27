@@ -9,10 +9,9 @@ Organization: Fermilab
 Grammar: Python 3.6.1
 """
 
-from .utils import to_categorical, from_categorical
-from .utils import plot3d, display_side_by_side
+from .utils import to_categorical, from_categorical, remove_padding_matrix
+from .utils import plot3d, display_side_by_side, remove_padding_event
 import numpy as np
-import keras.backend as kb
 from .tracker_types import PMatrix, Target, Train, Event
 from typing import Any
 
@@ -44,7 +43,7 @@ def wrong_classifications(target: PMatrix,
     # Iterate through the prediction rows and find wrong classifications.
     for j, row in enumerate(prediction):
         predict = np.argmax(row)  # The prediction for this row.
-        answer  = np.argmax(target[j])
+        answer  = np.argmax(target[j])  # The correct answer.
         if predict != answer:
             if verbose:
                 print("The model predicted hit {} incorrectly."
@@ -53,7 +52,7 @@ def wrong_classifications(target: PMatrix,
                       .format(row[predict]))
                 print("The correct track was {}."
                       .format(answer if answer < target.shape[1] else "noise"))
-            wrong_category += 1
+            wrong_category += 1  # We found a wrong classificaiton. Increment!
     if verbose:
         print("-- There were {} wrong classifications."
               .format(wrong_category))
@@ -87,13 +86,42 @@ def discretize(probs: PMatrix)\
     return to_categorical(from_categorical(probs), probs.shape[1])
 
 
-def hits_per_track(probs: PMatrix,
+def threshold_probabilities(prediction: PMatrix,
+                            threshold: float)\
+        -> PMatrix:
+    """ Return a threshold matrix from *prediction*.
+
+    The return matrix is the prediction matrix, except all values greater than
+    or equal to *threshold* are 1'd and values less than *threshold* are 0'd.
+
+    If threshold is 0.4:
+    prediction:           return:
+    [[0.4, 0.5,  0.1],     [[1, 1, 0],
+     [0.2, 0.2,  0.6],  ->  [0, 0, 1],
+     [0.4, 0.4,  0.2]]      [1, 1, 0],
+     [0.3, 0.35, 0.35]      [0, 0, 0]]
+
+    Arguments:
+        prediction (PMatrix):
+            The prediction matrix.
+        threshold (float):
+            A threshold value.
+
+    Return: PMatrix
+    """
+    matrix = np.copy(prediction)
+    matrix[prediction < threshold]  = 0
+    matrix[prediction >= threshold] = 1
+    return matrix
+
+
+def hits_per_track(matrix: PMatrix,
                    verbose: bool=False)\
         -> np.ndarray:
     """ Return an array of integers representing the number of hits per track.
 
     Arguments:
-        probs (PMatrix):
+        matrix (PMatrix):
             A probability matrix.
         verbose (bool):
             True if this functions should print anything. Else, no printing.
@@ -102,7 +130,7 @@ def hits_per_track(probs: PMatrix,
         An array of integers. The cell at index *i* contains the number of
         hits that are a member of track *i* as defined by *probs*.
     """
-    hits = discretize(probs).sum(axis=0)
+    hits = discretize(matrix).sum(axis=0)
     if verbose:
         for i, hit in enumerate(hits):
             print("Hits in Track {0}: {1}".format(i, hit))
@@ -139,14 +167,14 @@ def probability_hits_per_track(targets: Target,
     answer = sum([(hits_per_track(m)[track_id] == num_hits) for m in targets])
     if verbose:
         print("Number correct: {}".format(answer))
-    return answer / len(targets)
+    return answer / len(targets)  # Percent of events with correct hits/track.
 
 
 def discrete_accuracy(event: Event,
-                      prediction: PMatrix,
                       target: PMatrix,
+                      prediction: PMatrix,
                       verbose: bool=False,
-                      padding: bool=False)\
+                      padding: bool=True)\
         ->float:
     """ Return the discrete accuracy for this prediction.
 
@@ -172,16 +200,9 @@ def discrete_accuracy(event: Event,
         The discrete accuracy
     """
     if padding:
-        # Time to remove all the (0, 0, 0) hits and their corresponding rows
-        # in *target* and *prediction*.
-        zero = np.zeros(event.shape[1])
-        pad_idx = []
-        for i, hit in enumerate(event):
-            if np.all(np.equal(hit, zero)):
-                pad_idx.append(i)
-        event      = np.delete(event,      pad_idx, axis=0)
-        prediction = np.delete(prediction, pad_idx, axis=0)
-        target     = np.delete(target,     pad_idx, axis=0)
+        event      = remove_padding_event(event)
+        prediction = remove_padding_matrix(prediction)
+        target     = remove_padding_matrix(target)
 
     display_plots_and_tables = False  # If anything goes wrong, flips to True.
     discrete = discretize(prediction)
@@ -189,6 +210,8 @@ def discrete_accuracy(event: Event,
     # Time to calculate the accuracy
     accuracy = 0
     for i, row in enumerate(discrete):
+        # Check if the 1 in a row in the discrete accuracy matrix is at the
+        # same index as the 1 in a row for the target matrix.
         equivalent = np.equal(np.argmax(row), np.argmax(target[i]))
         accuracy  += int(equivalent)
         if verbose and not equivalent:
@@ -204,8 +227,8 @@ def discrete_accuracy(event: Event,
 
 
 def discrete_accuracy_all(train: Train,
-                          predictions: Target,
                           targets: Target,
+                          predictions: Target,
                           padding: bool=True)\
         -> float:
     """ Return the average discrete accuracy.
@@ -228,75 +251,124 @@ def discrete_accuracy_all(train: Train,
     Returns: (float)
         Average discrete accuracy
     """
-    zero     = np.zeros(train.shape[2])
+    zero     = np.zeros(train.shape[2])  # Used to determine row as padding.
     accuracy = 0
     count    = 0
     for i, event in enumerate(train):
-        discrete = discretize(predictions[i])
+        discrete = discretize(predictions[i])  # Discrete predictions matrix.
         for j, hit in enumerate(event):
             if padding and np.all(np.equal(hit, zero)):
                 # Skip padding events.
                 continue
             else:
+                # Check if a row in the discrete accuracy matrix and the
+                # target matrix are equal. If so, increment accuracy.
                 accuracy += np.all(np.equal(discrete[j], targets[i][j]))
                 count    += 1
-    return accuracy / count
+    return accuracy / count  # The percent of correct hits, not including noise.
 
 
-def print_discrete_metrics(train: Train,
-                           predictions: Target,
-                           targets: Target,
-                           padding: bool=False)\
-        -> None:
-    """ Print some discrete matrix metrics.
+def threshold_metrics(target: PMatrix,
+                      prediction: PMatrix,
+                      threshold: int,
+                      padding: bool=True)\
+        -> np.ndarray:
+    """ Return metrics corresponding to the threshold matrix.
+
+        Returns a np.ndarray consisting of four floats.
+        float 0: The probability that a hit was assigned to a correct track
+            by the threshold matrix.
+        float 1: The probability that a hit was assigned to an incorrect track
+            by the threshold matrix.
+        float 2: The probability that a hit was assigned to more than 1 track
+            by the threshold matrix.
+        float 3: The probability that a hit was assigned to no track by the
+            threshold matrix.
 
     Arguments:
-        predictions (PMatrix):
-            A list of predictions.
-        targets (PMatrix):
-            A list of ground truths matrices.
-        train (Train):
-            A list of hit events.
+        target (PMatrix):
+            The target matrix.
+        prediction (PMatrix):
+            A prediction matrix.
+        threshold (float):
+            A threshold value such that any value lower than this in prediction
+            matrix is 0'd and any value higher or equal to this is 1'd.
         padding (bool):
-            Tru
+            If padding is true, then the last column in target and prediction
+            is not considered. This is because the last column is the padding
+            column by convention.
 
-    Returns: (None)
+    Returns: np.ndarray
     """
-    for i, event in enumerate(predictions):
-        print("The event number is: {}".format(i))
-        discrete_accuracy(train[i], event, targets[i], verbose=True)
-    acc = discrete_accuracy_all(train, predictions, targets, padding=padding)
-    print("The overall accuracy is: {}".format(acc))
+    # Remove the padding column, if necessary.
+    tg_matrix = remove_padding_matrix(target) if padding else target
+    pd_matrix = remove_padding_matrix(prediction) if padding else prediction
+    n_hits    = tg_matrix.shape[0]
+    th_matrix = threshold_probabilities(pd_matrix, threshold)  # Threshold mtx.
+    stack     = np.dstack((tg_matrix, th_matrix)).transpose((0, 2, 1))
+
+    # For each pair of rows from tg_matrix and th_matrix, see if the element
+    # at the index where tg_matrix equals 1 also equals 1.
+    rights = np.sum([pair[1, np.argmax(pair[0])] == 1 for pair in stack])
+
+    # For each row in tg_matrix and th_matrix, Subtract the th_matrix row from
+    # the tg_matrix row. If that resulting 1-D array has any negative values,
+    # then we know that that there was some index such that the tg_matrix row
+    # did not categorize the hit as this index's track, but the th_matrix
+    # did, in fact, categorize the hit as this index's track.
+    wrongs = np.sum((stack[:, 0] - stack[:, 1] < 0).any(axis=1))
+
+    # If a row within the th_matrix has a sum of greater than 1, then we know
+    # that the th_matrix classified this hit with more than 1 track.
+    multis = np.sum(np.sum(th_matrix, axis=1) > 1)  # Hits assigned to multiple.
+
+    # If a row within the th_matrix has a sum of less than 1, then we know that
+    # the th_matrix did not classify this hit with any track.
+    notrks = np.sum(np.sum(th_matrix, axis=1) < 1)  # Hits unassigned to any.
+
+    return np.array([rights, wrongs, multis, notrks]) / n_hits
 
 
-def categorical_accuracy_padding(y_true: Tensor,
-                                 y_pred: Tensor)\
-        -> Tensor:
-    """ A custom metric to be compiled with a keras model.
+def track_metrics(target: PMatrix,
+                  pred: PMatrix,
+                  threshold: int,
+                  padding=True)\
+        -> np.ndarray:
+    """ % of tracks with at least *threshold* % of correct hits assigned.
 
-    WARNING: DOES NOT WORK!!! :(
+    So, suppose *threshold* were 0.5 and we had matrices with padding as the
+    last column.
+    Target                    Prediction
+    [[0, 1, 0],    [[0, 1],   [[0.4, 0.6, 0.0],     [[0, 1],
+     [1, 0, 0], --> [1, 0],    [0.9, 0.1, 0.0], -->  [1, 0],
+     [1, 0, 0],     [1, 0]]    [0.3, 0.7, 0.0],      [0, 1]]
+     [0, 0, 1]]                [0.0, 0.0, 1.0]]
+    Results to:
+    x = (2 == number of columns in target and prediction with the same index
+            that contain the same element at least *threshold* percent of the
+            time.
+    y = (2 == number of tracks that aren't padding)
+    Return: x / y == 2 / 2 = 100%
 
     Arguments:
-        y_true (Tensor):
-            The ground truth probability matrix as a tensor.
-        y_pred (Tensor):
-            The prediction probability matrix as a tensor.
+        target (PMatrix):
+            The target matrix.
+        pred (PMatrix):
+            The prediction matrix.
+        threshold (int):
+            The threshold value between 0 and 1.
+        padding (bool):
+            If True, last column and any padding rows are not considered, since
+            they correspond to padding.
 
-    Returns (Tensor):
+    Returns: (np.ndarray)
     """
-    # First, remove all the padding rows from *y_true* and *y_pred*.
-    true_array  = kb.get_value(y_true)  # The ground truth probability matrix.
-    pred_array  = kb.get_value(y_pred)  # The prediction probability matrix.
-    padding     = np.zeros(true_array.shape[1])  # A padding row.
-    padding[-1] = 1.0  # Set the last element in the pad row to 1.
-    pad_indices = np.where(np.all(true_array == padding, axis=1))
-    true_array  = np.delete(true_array, pad_indices, axis=0)
-    pred_array  = np.delete(pred_array, pad_indices, axis=0)
-    true_const  = kb.constant(true_array, shape=true_array.shape)
-    pred_const  = kb.constant(pred_array, shape=pred_array.shape)
-
-    # Finally, return tensor indicating which rows were such that both *y_true*
-    # and *y_pred* had maximum values at the same index in that particular row.
-    return kb.cast(kb.equal(kb.argmax(true_const, axis=-1),
-                            kb.argmax(pred_const, axis=-1)),
-                   kb.floatx())
+    nopad    = target[:, :-1]
+    target   = nopad[np.any(nopad != 0, axis=1)] if padding else target
+    pred     = pred[:, :-1][np.any(nopad != 0, axis=1)] if padding else pred
+    n_tracks = target.shape[1]
+    discrete = discretize(pred)
+    equals   = np.equal(target, discrete).transpose()
+    rights   = np.sum([target[i].sum() > 0 and threshold * len(e) <= e.sum()
+                       for i, e in enumerate(equals)])
+    return rights / n_tracks

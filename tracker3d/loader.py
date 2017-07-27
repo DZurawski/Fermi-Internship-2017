@@ -23,7 +23,7 @@ def from_frame(frame: pd.DataFrame,
                tpe: int,  # "Tracks Per Event"
                ts: int,   # "Track Size"
                variable_data: bool=False,
-               order: Sequence[str]= ("phi", "r", "z"),
+               order: Tuple[str, str, str]= ("phi", "r", "z"),
                verbose: bool=True,
                n_noise: int=0,
                preferred_rows: Optional[int]=None,
@@ -49,7 +49,7 @@ def from_frame(frame: pd.DataFrame,
             'event_id' -- integer that designates a hit to an event.
             'cluster_id' -- integer that designates the track of this hit.
             'phi' -- The phi angle (radians) describing hit position.
-            'r' -- The radius of the layer that this hit occured at.
+            'r' -- The radius of the layer that this hit occurred at.
             'z' -- The z value describing this hit's z coordinate.
         nev (int):
             "Number of Events" -- The number of events to generate.
@@ -71,7 +71,7 @@ def from_frame(frame: pd.DataFrame,
                     and tracks with less hits than *ts*.
             False if we want all events to have the same number of tracks
                     and all tracks to have the same number of hits.
-        order (Tuple[str]):
+        order (Tuple[str, str, str]):
             The order in which hits should be arranged. It should be some
             permutation of ("phi", "r", "z").
         verbose (bool):
@@ -142,7 +142,8 @@ def from_frame(frame: pd.DataFrame,
             _assign_cluster_id_to_matrix_index(goods, order, layers[0])
 
             # Finally, append this event to the list of trains and targets.
-            sortie = pd.concat([goods, noise]).sort_values(order)
+            concat = pd.concat([goods, noise])
+            sortie = concat.sort_values(order)
             tracks = sortie.cluster_id
             train.append(sortie[order].values)
             target.append(to_categorical(tracks.values, n_cat))

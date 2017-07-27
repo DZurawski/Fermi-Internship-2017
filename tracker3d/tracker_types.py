@@ -16,7 +16,6 @@ Grammar: Python 3.6.1
 # still be treated as distinct types for notation and typing purposes.
 
 import numpy as np
-from typing import List
 
 # A 1D array with columns representing position data of a hit within an event.
 Hit = np.ndarray
