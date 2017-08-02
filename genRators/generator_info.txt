@@ -1,6 +1,6 @@
 Here are R files that either generate completely new data or modify existing data.
 
-"add_z_to_100MeV.R"
+"add_z_to_file.R"
 	Given the public_train_100MeV.csv data set found in the datasets folder,
 	save a new data set with linear sloping z values.
 

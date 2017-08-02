@@ -1,0 +1,8 @@
+Tracker/datasets
+
+Contains two folders: "npz" and "raw".
+
+"npz" contains .npz files that contain train and target information. They can be extracted using the "load_file" function from the Tracker/tracker3d/loader module.
+
+
+"raw" contains .csv files. These files are raw files that have not yet been processed by the "load_frame" function from the Tracker/tracker3d/loader module.

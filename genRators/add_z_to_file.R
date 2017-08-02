@@ -1,14 +1,15 @@
-# add_z_to_100MeV.R
+# add_z_to_file.R
 # Author: Daniel Zurawski
-# Modify the RAMP data set found in "public_train_100MeV.csv" by adding a
-# linear-slope z component.
+# Modify the in_filename file by adding a linear-sloping z component and then
+# save this new file to out_filename.
+# Take a dataframe with columns (event_id, cluster_id, x, y)
 # Save a dataframe with columns (event_id, cluster_id, r, phi, z).
 
 require("tidyr")
 require("dplyr")
 
-in_filename   <- "../datasets/public_train_100MeV.csv"
-out_filename  <- "../datasets/standard_curves100MeV.csv"
+in_filename   <- "../datasets/unif_50t_8000e.csv"
+out_filename  <- "../datasets/unif_50t_8000e_z.csv"
 z.bounds      <- c(-200, 200) # What should the min and max z values be?
 initial.frame <- read.csv(in_filename) %>%
                     mutate(phi = atan2(y, x)) %>%                

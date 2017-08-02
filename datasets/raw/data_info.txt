@@ -1,0 +1,16 @@
+Tracker/datasets/raw
+
+"ramp.csv"
+The RAMP data. Note that this data set was generated and not actually data from real physics collisions.
+
+"ramp_z.csv"
+The RAMP data, but with a linearly increasing/decreasing z component applied to each track. The process used to add this z component to the RAMP data can be found under "Tracker/genRators/add_z_to_file.R".
+
+"track_bank.csv"
+A collection of tracks used to generate uniform data sets. All tracks within this bank are all sampled from "ramp_z.csv".
+
+"unif_25t_4000e.csv"
+A data set consisting of 4000 events. The maximum number of tracks within a single event is 25 and the minimum number of tracks within a single event is 1. There are roughly an equal number of events with "n" number of tracks for all "n" within [1, 25].
+
+"unif_50t_8000e.csv"
+A data set consisting of 800 events. The maximum number of tracks within a single event is 50 and the minimum number of tracks within a single event is 1. There are roughly an equal number of events with "n" number of tracks for all "n" within [1, 50].

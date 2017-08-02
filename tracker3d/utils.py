@@ -64,23 +64,11 @@ def plot3d(hits: Event,
     """
     if target is None:
         plot = Plot3D(
-                hits,
-                prediction,
-                prediction,
-                order,
-                flat_ax,
-                padding,
-                has_noise
+                hits, prediction, prediction, order, flat_ax, padding, has_noise
         )
     else:
         plot = Plot3D(
-                hits,
-                prediction,
-                target,
-                order,
-                flat_ax,
-                padding,
-                has_noise
+                hits, prediction, target, order, flat_ax, padding, has_noise
         )
     plot.plot(title)
     return plot  # Please assign this to something after function.
@@ -225,10 +213,10 @@ def multi_column_df_display(list_dfs: Sequence[pd.DataFrame],
 
 
 def display_side_by_side(train: Event,
-                         target: PMatrix,
-                         predictions: Optional[PMatrix] = None,
-                         order: Sequence[str] = ("phi", "r", "z"),
-                         display: str = None) \
+                         prediction: PMatrix,
+                         target: Optional[PMatrix]=None,
+                         order: Sequence[str]=None,
+                         display: str="") \
         -> None:
     """ Display an event of train, target and predictions data on IPython.
 
@@ -237,59 +225,37 @@ def display_side_by_side(train: Event,
             The training data to display.
         target (PMatrix):
             The target data to display.
-        predictions (Optional[PMatrix]):
+        prediction (Optional[PMatrix]):
             A PMatrix matrix of predicted probabilities.
         order (Sequence[str]):
             An ordering for the Hit frame's labels.
         display (optional str):
             A parameter to check how to display the data.
-            "together" displays the target and prediction matrices within the
-            same cell, separated by and underscore. Target on left,
-            prediction on right.
             "subtract" displays the difference between target and prediction.
             Otherwise, display the prediction table after the target table.
 
     Returns: (None)
     """
-    if display == "together" and predictions is not None:
-        output = [["({0})_({1})".format(
-                target[i, j].round(2),
-                predictions[i, j].round(2)
-        )
-            for j in range(target.shape[1])]
-            for i in range(target.shape[0])]
-    elif display == "subtract" and predictions is not None:
-        output = np.subtract(target, predictions).round(2)
+    frames = [pd.DataFrame(data=train, columns=order)]
+    cols   = ["T{}".format(i) for i in range(prediction.shape[1])]
+    pr     = prediction.round(2)
+    tr     = target.round(2) if target is not None else None
+
+    if display == "subtract" and target is not None:
+        frame = pd.DataFrame(data=tr - pr, columns=cols)
+        frames.append(frame.replace(0, ""))
     else:
-        output = target.round(2)
-
-    target_cols = ["T{}".format(i) for i in range(target.shape[1])]
-    order = list(order)
-
-    # Create pandas frames from the input data.
-    input_frames  = pd.DataFrame(data=train, columns=order)
-    output_frames = (pd.DataFrame(data=output, columns=target_cols)
-                     .replace(0, "")
-                     .replace("(0)_(0)", "")
-                     .replace("(0.00)_(0.00)", ""))
-
-    df_list = [input_frames, output_frames]
-
-    # If predictions was specified, add it to the data frame list *df_list*.
-    if predictions is not None and display is None:
-        print("Prediction shape: {}".format(predictions.shape))
-        prediction_frames = (pd.DataFrame(data=predictions.round(2),
-                                          columns=target_cols)
-                             .replace(0.00, ""))
-        df_list.append(prediction_frames)
-
-    # Display the data frame list using HTML.
-    multi_column_df_display(df_list, len(df_list))
+        frame = pd.DataFrame(data=pr, columns=cols)
+        frames.append(frame.replace(0, ""))
+        if target is not None:
+            frame = pd.DataFrame(data=tr, columns=cols)
+            frames.append(frame.replace(0, ""))
+    multi_column_df_display(frames, len(frames))
 
 
 def print_scores(model: Any,
-                 train: Train,
-                 target: Target,
+                 trains: Train,
+                 targets: Target,
                  batch_size: int)\
         -> None:
     """ Print out evaluation score and accuracy from a model.
@@ -297,16 +263,16 @@ def print_scores(model: Any,
     Arguments:
         model (keras model):
             The keras model to evaluate.
-        train (Train):
+        trains (Train):
             The input data that the model trained on.
-        target (Target):
+        targets (Target):
             The output data that the model trained on.
         batch_size (int):
             The batch size for evaluation.
         
     Returns: (None)
     """
-    score, acc = model.evaluate(train, target, batch_size=batch_size)
+    score, acc = model.evaluate(trains, targets, batch_size=batch_size)
     print("\nTest Score:    {}".format(score))
     print("Test Accuracy: {}".format(acc))
 
@@ -336,7 +302,8 @@ def number_of_tracks(matrix: PMatrix,
     return sum([sum(c) > 0 for c in matrix.transpose()[:limit]])
 
 
-def number_of_hits(event: Event) -> int:
+def number_of_hits(event: Event)\
+        -> int:
     """ Return the number of hits in this event.
 
     Arguments:
@@ -348,7 +315,8 @@ def number_of_hits(event: Event) -> int:
     return sum(event != np.zeros(event.shape[1]))
 
 
-def remove_padding_event(event: Event) -> Event:
+def remove_padding_event(event: Event)\
+        -> Event:
     """ Remove the zeros padding rows from the event.
 
     Arguments:
@@ -361,18 +329,24 @@ def remove_padding_event(event: Event) -> Event:
     return event[np.any(event != 0, axis=1)]
 
 
-def remove_padding_matrix(matrix: PMatrix) -> PMatrix:
+def remove_padding_matrix(matrix: PMatrix,
+                          target: Optional[PMatrix])\
+        -> PMatrix:
     """ Remove the padding column and padding rows from *matrix*.
 
     Arguments:
         matrix (PMatrix):
             A probability matrix.
+        target (PMatrix):
+            The target matrix used to figure out which rows are padding rows.
 
     Returns: (PMatrix)
         A copy of the probability matrix, but without a padding column or any
         padding rows.
     """
-    return matrix[:, :-1][np.any(matrix[:, :-1] != 0, axis=1)]
+    if target is None:
+        target = matrix
+    return matrix[:, :-1][np.any(target[:, :-1] != 0, axis=1)]
 
 
 class Plot3D:
@@ -421,12 +395,13 @@ class Plot3D:
         """
         if padding:
             event  = remove_padding_event(event)
-            target = remove_padding_matrix(target)
-            pred   = remove_padding_matrix(pred)
+            pred   = remove_padding_matrix(pred, target)
+            target = remove_padding_matrix(target, target)
 
         self.ids       = from_categorical(pred)  # List of cluster ids.
         self.act_ids   = from_categorical(target)  # List of actual ids.
         self.probs     = from_categorical_prob(pred)  # List of probabilities.
+        self.order     = order
 
         self.cylinders = []  # Storage area for layer cylinder displays.
         self.num_ids   = len(self.ids)  # Number of ids.
@@ -569,7 +544,7 @@ class Plot3D:
         edx    = event.ind[0]
         artist = event.artist
         if self.flat_ax is not None:
-            pos = tuple(artist.get_offsets()[0])
+            pos = tuple(artist.get_offsets()[edx])
         else:
             pos = tuple(np.array(artist._offsets3d)[0:3, edx])
         hdx    = self.pos2idx[pos]

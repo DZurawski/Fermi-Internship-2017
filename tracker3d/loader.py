@@ -11,7 +11,7 @@ Grammar: Python 3.6.1
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, Sequence, List, Optional
+from typing import Tuple, Sequence, Optional
 from .tracker_types import Train, Target, Event, PMatrix
 from .utils import to_categorical
 from keras.preprocessing.sequence import pad_sequences
@@ -139,7 +139,7 @@ def from_frame(frame: pd.DataFrame,
             noise = _make_noise(n_noise, goods, n_cat)
 
             # Adjust each cluster_id to an index within a probability matrix.
-            _assign_cluster_id_to_matrix_index(goods, order, layers[0])
+            _assign_cluster_id_to_matrix_index(goods, layers[0])
 
             # Finally, append this event to the list of trains and targets.
             concat = pd.concat([goods, noise])
@@ -245,7 +245,6 @@ def _get_lowest_uniques(frame: pd.DataFrame,
 
 
 def _assign_cluster_id_to_matrix_index(frame: pd.DataFrame,
-                                       order: List[str],
                                        min_r: int)\
         -> None:
     """ Assign the cluster_id within the frame to a matrix index.
@@ -253,14 +252,12 @@ def _assign_cluster_id_to_matrix_index(frame: pd.DataFrame,
     Arguments:
         frame (pd.DataFrame):
             A data frame with a cluster_id column.
-        order (List[str]):
-            The ordering for how to sort the frame.
         min_r (int):
             The smallest r (layer) value to be used to order cluster_ids.
 
     Returns: (None)
     """
-    low_r = frame[frame.r == min_r].sort_values(order)
+    low_r = frame[frame.r == min_r].sort_values(["phi", "z"])
     id2i  = dict((_id, i) for i, _id in enumerate(low_r.cluster_id))
     frame.cluster_id = frame.cluster_id.map(id2i)
 
