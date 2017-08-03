@@ -166,8 +166,8 @@ def probability_hits_per_track(targets: Target,
     return answer / len(targets)  # Percent of events with correct hits/track.
 
 
-def discrete_accuracy(target: PMatrix,
-                      guess: PMatrix,
+def discrete_accuracy(guess: PMatrix,
+                      target: PMatrix,
                       padding: bool=True)\
         ->float:
     """ Return the discrete accuracy for this guess.
@@ -189,15 +189,15 @@ def discrete_accuracy(target: PMatrix,
         The discrete accuracy
     """
     if padding:
-        guess = remove_padding_matrix(guess, target)
+        guess      = remove_padding_matrix(guess, target)
         target     = remove_padding_matrix(target, target)
     discrete = discretize(guess)
-    return np.equal(target, discrete).all(axis=0).sum() / target.shape[0]
+    return np.equal(target, discrete).all(axis=1).sum() / target.shape[0]
 
 
 def discrete_accuracy_all(train: Train,
-                          targets: Target,
                           guesses: Target,
+                          targets: Target,
                           padding: bool=True)\
         -> float:
     """ Return the average discrete accuracy.
