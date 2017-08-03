@@ -352,10 +352,10 @@ def accuracy_vs_tracks(guesses: Target,
                        has_noise: bool=False,
                        has_padding: bool=False)\
         -> np.ndarray:
-    hp, hn = has_padding, has_noise  # shorthand
-    ts, ps = targets, guesses  # More shorthand
-    tracks = [number_of_tracks(matrix, hp, hn) for matrix in ts]
-    acc    = [discrete_accuracy(ts[i], ps[i], hp) for i in range(len(ts))]
+    tracks = [number_of_tracks(matrix, has_padding, has_noise)
+              for matrix in targets]
+    acc    = [discrete_accuracy(guesses[i], targets[i], has_padding)
+              for i in range(targets.shape[0])]
     return np.array([tracks, acc])
 
 
