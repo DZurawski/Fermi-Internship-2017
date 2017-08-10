@@ -26,7 +26,7 @@ def from_frame(frame: pd.DataFrame,
                n_noise: int=0,
                preferred_rows: Optional[int]=None,
                preferred_tracks: Optional[int]=None,
-               event_range: Tuple(int, int)=None)\
+               event_range: Optional[Tuple[int, int]]=None)\
         -> Tuple[Train, Target]:
     """ Load input and output data from *frame*.
 
