@@ -11,34 +11,31 @@ Grammar: Python 3.6.1
 
 import numpy as np
 import pandas as pd
-from typing import Tuple, Sequence, Optional
-from .tracker_types import Train, Target, Event, PMatrix
-from .utils import to_categorical
 from keras.preprocessing.sequence import pad_sequences
 from scipy.sparse import csr_matrix
+from typing import Tuple, Sequence, Optional
+from .tracker_types import Train, Target, Event, PMatrix
+from . import utils
 
 
 def from_frame(frame: pd.DataFrame,
-               nev: int,  # "Number of Events"
-               tpe: int,  # "Tracks Per Event"
-               ts: int,   # "Track Size"
-               variable_data: bool=False,
-               order: Tuple[str, str, str]= ("phi", "r", "z"),
-               verbose: bool=True,
+               nev: int=-1,  # "Max Number of Events"
+               tpe: int=-1,  # "Max Tracks Per Event"
+               ts: int=-1,   # "Max Track Size"
+               order: Tuple[str, str, str]=("phi", "z", "r"),
                n_noise: int=0,
                preferred_rows: Optional[int]=None,
-               preferred_tracks: Optional[int]=None)\
+               preferred_tracks: Optional[int]=None,
+               event_range: Tuple(int, int)=None)\
         -> Tuple[Train, Target]:
     """ Load input and output data from *frame*.
 
-    Each event returned has the same number of tracks and each track has the
-    same number of corresponding hits. If variable_data is True, then some of
-    these hits will be padding: (0, 0, 0) entries. The last column in the
-    Target's PMatrix's correspond to the padding category.
-
-    If *n_noise* is greater than 0, then each Event in the Train input data will
-    have *n_noise* number of noisy hits. Noisy hits belong to no track. The
-    second to last column in the PMatrix's correspond to the noise category.
+    Usually, some of these hits will be padding: (0, 0, 0) entries.
+    The last column in the Target's PMatrix's correspond to the
+    padding category. If *n_noise* is greater than 0, then each Event in the
+    Train input data will have *n_noise* number of noisy hits. Noisy hits
+    belong to no track. The second to last column in the PMatrix's correspond
+    to the noise category.
 
     Arguments:
         frame (pd.DataFrame):
@@ -52,31 +49,19 @@ def from_frame(frame: pd.DataFrame,
             'r' -- The radius of the layer that this hit occurred at.
             'z' -- The z value describing this hit's z coordinate.
         nev (int):
-            "Number of Events" -- The number of events to generate.
+            "Number of Events" -- The max number of events to generate.
             Will generate up to *nev* events, but it is possible that
             less events are generated, if the *frame* does not contain
-            enough valid events.
+            enough valid events. If nev < 0, then load in all events.
         tpe (int):
-            "Tracks per Event" -- How many tracks belong to each event.
-            If *variable_data* is True, then *tpe* is the upper limit for
-            how many tracks belong to each event. Otherwise, all events
-            have the same number of tracks (*tpe*) assigned to them.
+            "Tracks per Event" -- Max num of tracks that belong to each event.
+            If tpe < 0, then there will not be a max.
         ts (int):
-            "Track Size" -- The number of hits that belong to each track.
-            If *variable_data* is True, then *ts* is the upper limit for
-            how many hits belong to each track. Otherwise, all tracks have
-            the same number of hits (*ts*) assigned to them.
-        variable_data (bool):
-            True if we want to load in events with less tracks than *tpe*
-                    and tracks with less hits than *ts*.
-            False if we want all events to have the same number of tracks
-                    and all tracks to have the same number of hits.
+            "Track Size" -- Max number of hits that belong to each track.
+            If ts < 0, then there will not be a max.
         order (Tuple[str, str, str]):
             The order in which hits should be arranged. It should be some
             permutation of ("phi", "r", "z").
-        verbose (bool):
-            If True, the the function will print failures to standard out.
-            If False, the function will not print anything.
         n_noise (int):
             How much noise to add per event. This should be non-negative.
         preferred_rows (Optional[int]):
@@ -93,73 +78,41 @@ def from_frame(frame: pd.DataFrame,
             shape = (number of loaded-in events, hits per event, 3)
         Target : np.array with 3 dimensions.
             shape = (number of loaded-in events, hits per event, categories)
-        If *variable_data* is True, then each Event in Train will be padded
-        with rows of 0's at the end so that each Event is the same shape.
-        Also, each PMatrix in Target will consist of (n + 2) columns,
-        where n is the max number of tracks in any event.
+        Each Event in Train will be padded with rows of 0's at the end so that
+        each Event is the same shape. Also, each PMatrix in Target will consist
+        of (n + 2) columns, where n is the max number of tracks in any event.
     """
+    ts     = len(pd.unique(frame.r)) if (ts < 0) else ts
     order  = list(order)  # Will absolutely need *order* to be a list for pd.
     train  = []  # Will contain hit position arrays.
     target = []  # Will contain target probability matrices.
-
-    # *layers* is an array of unique valid r values that hits can have.
-    # Valid r values are the lowest *ts* number of r values.
-    # If *ts* > (number of layers), then *layers* is all unique layers.
-    layers = _get_lowest_uniques(frame.r, ts)
-
-    # *hits* is a pd.DataFrame where rows contain hit info for a some hit.
-    hits = frame[frame.r.isin(layers)]
-
-    # Just a list of Events.
+    hits   = frame[frame.r.isin(_get_lowest_uniques(frame.r, ts))]
     events = [event for (_, event) in hits.groupby("event_id")]
+    max_tk = max([len(e.groupby("cluster_id")) for e in events])
+    nev    = len(events) if (nev < 0) else nev
+    tpe    = max_tk if (tpe < 0) else min([tpe, max_tk])
+    n_cat  = tpe + 2 if preferred_tracks is None else preferred_tracks
+    space  = min([len(events), nev]) if event_range is None else event_range
+    for i in range(space):
+        # Get eligible tracks.
+        ids   = _get_lowest_uniques(events[i].cluster_id, tpe)
+        goods = events[i][events[i].cluster_id.isin(ids)]
+        noise = _make_noise(n_noise, goods, n_cat)
 
-    # The number of successful event extractions.
-    wins = 0
+        # Adjust each cluster_id to an index within a probability matrix.
+        idx  = goods.groupby(["cluster_id"])["r"].transform(min) == goods["r"]
+        lows = goods[idx].sort_values(["phi", "z", "r"])
+        id2i = dict((_id, i) for i, _id in enumerate(lows.cluster_id))
+        goods.cluster_id = goods.cluster_id.map(id2i)
 
-    # Adjust *tpe* for *tpe* that are too large.
-    if variable_data:
-        tpe = min(tpe, max(frame.groupby(["event_id", "r"]).size()))
-
-    # Function to be used to filter out the tracks with unwanted track size.
-    def good_len(track: pd.DataFrame) -> bool:
-        return (track.r.min() == layers[0]
-                and (((len(track) <= ts) and variable_data)
-                     or ((len(track) == ts) and not variable_data)))
-
-    # It is time to populate the *train* and *target* lists.
-    for i, event in enumerate(events):
-        if nev <= wins:
-            break  # We have enough successful event extractions. Time to go.
-        try:
-            # Get eligible tracks.
-            goods = event.groupby("cluster_id").filter(good_len)
-            ids   = _get_lowest_uniques(goods.cluster_id, tpe)
-            goods = goods[goods.cluster_id.isin(ids)]
-            n_cat = tpe + 2 if preferred_tracks is None else preferred_tracks
-            noise = _make_noise(n_noise, goods, n_cat)
-
-            # Adjust each cluster_id to an index within a probability matrix.
-            _assign_cluster_id_to_matrix_index(goods, layers[0])
-
-            # Finally, append this event to the list of trains and targets.
-            concat = pd.concat([goods, noise])
-            sortie = concat.sort_values(order)
-            tracks = sortie.cluster_id
-            train.append(sortie[order].values)
-            target.append(to_categorical(tracks.values, n_cat))
-            wins += 1
-        except ValueError:
-            if verbose:
-                print("Failed reading event index {}.".format(i))
-    if verbose:
-        print("All finished. Loaded in {0} / {1}".format(wins, nev))
-
-    # Pad the sequences to allow for variable number of hits per event
-    # and variable number of tracks per event.
-    return _padded_train_and_target(
-            train[:wins],
-            target[:wins],
-            preferred_rows)
+        # Finally, append this event to the list of trains and targets.
+        concat = pd.concat([goods, noise])
+        sortie = concat.sort_values(order)
+        tracks = sortie.cluster_id
+        train.append(sortie[order].values)
+        target.append(utils.to_categorical(tracks.values, n_cat))
+    print("All finished. Loaded in {}.".format(min([len(events), nev])))
+    return _padded_train_and_target(train, target, preferred_rows)
 
 
 def to_file(train: Train,
@@ -242,24 +195,6 @@ def _get_lowest_uniques(frame: pd.DataFrame,
     uniques  = pd.unique(frame)
     n_unique = np.min([len(uniques), max_size])
     return np.sort(np.partition(uniques, n_unique - 1))[:n_unique]
-
-
-def _assign_cluster_id_to_matrix_index(frame: pd.DataFrame,
-                                       min_r: int)\
-        -> None:
-    """ Assign the cluster_id within the frame to a matrix index.
-
-    Arguments:
-        frame (pd.DataFrame):
-            A data frame with a cluster_id column.
-        min_r (int):
-            The smallest r (layer) value to be used to order cluster_ids.
-
-    Returns: (None)
-    """
-    low_r = frame[frame.r == min_r].sort_values(["phi", "z"])
-    id2i  = dict((_id, i) for i, _id in enumerate(low_r.cluster_id))
-    frame.cluster_id = frame.cluster_id.map(id2i)
 
 
 def _padded_train_and_target(train: Sequence[Event],

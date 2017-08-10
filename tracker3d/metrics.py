@@ -9,11 +9,11 @@ Organization: Fermilab
 Grammar: Python 3.6.1
 """
 
-from .utils import number_of_tracks
-from .utils import to_categorical, from_categorical, remove_padding_matrix
 import numpy as np
-from .tracker_types import PMatrix, Target, Train
+import matplotlib.pyplot as plt
 from typing import List, Tuple
+from .tracker_types import PMatrix, Target, Train
+from . import utils
 
 
 def wrong_classifications(guess: PMatrix,
@@ -79,7 +79,7 @@ def discretize(probs: PMatrix)\
         Return a matrix of the same shape as probabilities such that each
         row contains a single 1 and the rest 0's.
     """
-    return to_categorical(from_categorical(probs), probs.shape[1])
+    return utils.to_categorical(utils.from_categorical(probs), probs.shape[1])
 
 
 def threshold_probabilities(guess: PMatrix,
@@ -189,8 +189,8 @@ def discrete_accuracy(guess: PMatrix,
         The discrete accuracy
     """
     if padding:
-        guess      = remove_padding_matrix(guess, target)
-        target     = remove_padding_matrix(target, target)
+        guess      = utils.remove_padding_matrix(guess, target)
+        target     = utils.remove_padding_matrix(target, target)
     discrete = discretize(guess)
     return np.equal(target, discrete).all(axis=1).sum() / target.shape[0]
 
@@ -271,8 +271,8 @@ def threshold_metrics(guess: PMatrix,
     """
     # Remove the padding column, if necessary.
     if padding:
-        tg_matrix = remove_padding_matrix(target, target)
-        pd_matrix = remove_padding_matrix(guess, target)
+        tg_matrix = utils.remove_padding_matrix(target, target)
+        pd_matrix = utils.remove_padding_matrix(guess, target)
     else:
         tg_matrix = target
         pd_matrix = guess
@@ -317,11 +317,11 @@ def track_metrics(guess: PMatrix,
      [1, 0, 0],     [1, 0]]    [0.3, 0.7, 0.0],      [0, 1]]
      [0, 0, 1]]                [0.0, 0.0, 1.0]]
     Results to:
-    x = (2 == number of columns in target and prediction with the same index
+    x = (number of columns in target and prediction with the same index
             that contain the same element at least *threshold* percent of the
             time.
-    y = (2 == number of tracks that aren't padding)
-    Return: x / y == 2 / 2 = 100%
+    y = (number of tracks that aren't padding)
+    Return: (x / y) -> (2 / 2) -> (100%)
 
     Arguments:
         target (PMatrix):
@@ -347,22 +347,55 @@ def track_metrics(guess: PMatrix,
     return rights / n_tracks
 
 
-def accuracy_vs_tracks(guesses: Target,
-                       targets: Target,
-                       has_noise: bool=False,
-                       has_padding: bool=False)\
-        -> np.ndarray:
-    tracks = [number_of_tracks(matrix, has_padding, has_noise)
+def accuracy_vs_tracks_boxplot(guesses: Target,
+                               targets: Target,
+                               noise: bool=True,
+                               padding: bool=True,
+                               plot=True)\
+        -> Tuple[np.ndarray, np.ndarray]:
+    """ Plot and return accuracy vs number of tracks.
+
+    Arguments:
+        guesses:
+            An array of prediction matrices.
+        targets:
+            An array of target matrices.
+        noise:
+            True if the matrices have noise column.
+        padding:
+            True if the matrices have a padding column.
+        plot:
+            True if you want this function to provide a box plot.
+            If true, then "n" box and whisker plots are drawn, where "n" is the
+            number of tracks represented in the target matrix. Each box plot
+            corresponds to the discrete accuracies of all events with that
+            number of tracks. So, for example, the 6th box and whisker plot
+            will correspond to the discrete accuracies of all events with 6
+            tracks.
+
+    Returns: Tuple[np.ndarray, np.ndarray]
+        
+    """
+    tracks = [utils.number_of_tracks(matrix, padding, noise)
               for matrix in targets]
-    acc    = [discrete_accuracy(guesses[i], targets[i], has_padding)
+    acc    = [discrete_accuracy(guesses[i], targets[i], padding)
               for i in range(targets.shape[0])]
-    return np.array([tracks, acc])
+    if plot:
+        boxes = [[] for _ in range(targets.shape[2] + 1)]
+        for i in range(targets.shape[0]):
+            boxes[tracks[i]].append(acc[i])
+        plt.figure()
+        plt.xlabel("Number of Tracks")
+        plt.ylabel("Discrete Accuracy")
+        plt.boxplot(boxes)
+        plt.show()
+    return tracks, acc
 
 
 def hit_accuracy(hit_num: int,
                  predictions: Target,
                  targets: Target,
-                 thresholdValue: float,
+                 threshold_value: float,
                  threshold: bool=True)\
         -> float:
     """ % of events with a given hit classified correctly.
@@ -388,7 +421,7 @@ def hit_accuracy(hit_num: int,
     # Check if we want threshold or discrete accuracy
     if threshold:
         for i, event in enumerate(predictions):
-            prob.append(threshold_probabilities(event, thresholdValue))
+            prob.append(threshold_probabilities(event, threshold_value))
 
     else:
         for i, event in enumerate(predictions):
@@ -397,13 +430,13 @@ def hit_accuracy(hit_num: int,
     probability = np.array(prob)
     prob_no_padding = []
     for i, event in enumerate(probability):
-        prob_no_padding.append(remove_padding_matrix(event, targets[i]))
+        prob_no_padding.append(utils.remove_padding_matrix(event, targets[i]))
     prob_no_padding = np.array(prob_no_padding)
 
     # Removes the padding from the Target matrices.
     target_no_padding = []
     for i, target in enumerate(targets):
-        target_no_padding.append(remove_padding_matrix(target, target))
+        target_no_padding.append(utils.remove_padding_matrix(target, target))
     target_no_padding = np.array(target_no_padding)
 
     # Counts the number of events that classified the given hit correctly.
@@ -419,34 +452,56 @@ def hit_accuracy(hit_num: int,
     return accuracy/count
 
 
-def accuracy_vs_threshold(guesses: Target,
-                          targets: Target,
-                          thresholds: List[float],
-                          has_padding: bool=False,
-                          variation: int=0)\
+def threshold_boxplot(guesses: Target,
+                      targets: Target,
+                      thresholds: List[float],
+                      variation: str,
+                      padding: bool=True,
+                      plot=True)\
         -> np.ndarray:
-    return np.array([[threshold_metrics(guesses[i], targets[i], t, has_padding)
-                     for i in range(len(targets))]
-                    for t in thresholds]).transpose()[variation]
-
-
-def average_accuracy_vs_track(tracks: np.ndarray,
-                              accuracy: np.ndarray)\
-        -> Tuple[np.ndarray, np.ndarray]:
-    """ Returns two arrays, one array with average accuracy for individual
-    track sizes, and one array with track sizes
+    """ Create multiple box plots for each threshold in thresholds.
 
     Arguments:
-         tracks: (np.ndarray)
-            An array containing track sizes.
-        accuracy: (np.ndarray)
-            An array containing accuracies.
+        guesses
+        targets
+        thresholds
+        padding
+        variation
+        plot
 
-    Returns: Two arrays containing the average accuracy for events with the
-    same size and  the corresponding track size.
+    Returns (np.ndarray)
+        accuracies
     """
+    variations = ("correct", "incorrect", "many", "none")
+    if variation.lower() not in variations:
+        print("Error: the 'variation' variable was not found in function:")
+        print("'threshold_boxplot' in the 'metrics' module.")
+        return np.array([])
+    index = variations.index(variation.lower())
 
-    # Finds the max number of tracks in any event.
+    accuracies = [[threshold_metrics(guesses[i], targets[i], th, padding)
+                   for i in range(targets.shape[0])]
+                  for th in thresholds]
+    accuracies = np.array(accuracies).transpose()[index]
+
+    if plot:
+        plt.figure()
+        plt.boxplot(accuracies)
+        plt.xlabel("Threshold Value")
+        plt.ylabel("Metric")
+        plt.xticks(range(1, 1 + len(thresholds)), thresholds)
+        plt.show()
+    return accuracies
+
+
+def avg_accuracy_vs_track_scatter(guesses: Target,
+                                  targets: Target,
+                                  noise: bool=True,
+                                  padding: bool=True,
+                                  plot=True)\
+        -> Tuple[np.ndarray, np.ndarray]:
+    tracks, accuracy = accuracy_vs_tracks_boxplot(guesses, targets, noise,
+                                                  padding, plot=False)
     num_tracks = int(np.amax(tracks))
     out_accuracy = np.zeros(num_tracks)
     for i in range(num_tracks):
@@ -466,5 +521,10 @@ def average_accuracy_vs_track(tracks: np.ndarray,
     # Creates the track size array.
     for i in range(num_tracks):
         track[i] = i + 1
+
+    if plot:
+        plt.figure()
+        plt.scatter(track, out_accuracy)
+        plt.show()
 
     return track, out_accuracy

@@ -8,8 +8,8 @@
 require("tidyr")
 require("dplyr")
 
-in_filename   <- "../datasets/unif_50t_8000e.csv"
-out_filename  <- "../datasets/unif_50t_8000e_z.csv"
+in_filename   <- "../datasets/raw/generated.csv"
+out_filename  <- "../datasets/raw/unif_25t_5000e.csv"
 z.bounds      <- c(-200, 200) # What should the min and max z values be?
 initial.frame <- read.csv(in_filename) %>%
                     mutate(phi = atan2(y, x)) %>%                
@@ -29,7 +29,7 @@ initial.frame <-initial.frame %>%
                           runif(1, eta.bounds[3], eta.bounds[4])), 1)) %>%
     ungroup() %>%
     mutate(z = ((r) / tan(eta))) %>%
-    arrange(event_id, cluster_id, layer) %>%
+    arrange(event_id, cluster_id, r) %>%
     select(event_id, cluster_id, r, phi, z)
 
 write.csv(

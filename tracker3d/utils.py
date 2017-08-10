@@ -64,11 +64,11 @@ def plot3d(hits: Event,
     """
     if target is None:
         plot = Plot3D(
-                hits, prediction, prediction, order, flat_ax, padding, has_noise
+            hits, prediction, prediction, order, flat_ax, padding, has_noise
         )
     else:
         plot = Plot3D(
-                hits, prediction, target, order, flat_ax, padding, has_noise
+            hits, prediction, target, order, flat_ax, padding, has_noise
         )
     plot.plot(title)
     return plot  # Please assign this to something after function.
@@ -144,8 +144,9 @@ def to_categorical(ids: Sequence[int],
         numpy 2D array probability matrix
     """
     matrix = np.zeros((len(ids), columns))
-    for i, ID in enumerate(ids):
-        matrix[i][ID] = 1
+    for i in range(len(ids)):
+        if ids[i] < columns:
+            matrix[i, ids[i]] = 1
     return matrix
 
 
