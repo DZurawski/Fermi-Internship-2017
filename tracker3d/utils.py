@@ -331,7 +331,7 @@ def remove_padding_event(event: Event)\
 
 
 def remove_padding_matrix(matrix: PMatrix,
-                          target: Optional[PMatrix])\
+                          target: Optional[PMatrix]=None)\
         -> PMatrix:
     """ Remove the padding column and padding rows from *matrix*.
 

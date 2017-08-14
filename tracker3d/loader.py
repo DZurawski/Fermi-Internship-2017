@@ -72,6 +72,8 @@ def from_frame(frame: pd.DataFrame,
             tracks per event among all events. If you decide to specify this,
             remember to add enough columns to accommodate the noise category
             and the padding category!
+        event_range:
+            The range used to take a subset from the events.
 
     Returns: (Tuple[Train, Target])
         Train  : np.array with 3 dimensions.
@@ -82,18 +84,22 @@ def from_frame(frame: pd.DataFrame,
         each Event is the same shape. Also, each PMatrix in Target will consist
         of (n + 2) columns, where n is the max number of tracks in any event.
     """
-    ts     = len(pd.unique(frame.r)) if (ts < 0) else ts
+    ts     = len(pd.unique(frame["r"])) if (ts < 0) else ts
     order  = list(order)  # Will absolutely need *order* to be a list for pd.
     train  = []  # Will contain hit position arrays.
     target = []  # Will contain target probability matrices.
     hits   = frame[frame.r.isin(_get_lowest_uniques(frame.r, ts))]
-    events = [event for (_, event) in hits.groupby("event_id")]
+    events = [event for (_, event) in hits.groupby(by="event_id", sort=False)]
     max_tk = max([len(e.groupby("cluster_id")) for e in events])
     nev    = len(events) if (nev < 0) else nev
     tpe    = max_tk if (tpe < 0) else min([tpe, max_tk])
     n_cat  = tpe + 2 if preferred_tracks is None else preferred_tracks
-    space  = min([len(events), nev]) if event_range is None else event_range
-    for i in range(space):
+    if event_range is None:
+        space = range(min([len(events), nev]))
+    else:
+        space = range(min([event_range[0], len(events)]),
+                      min([event_range[1], len(events)]))
+    for i in space:
         # Get eligible tracks.
         ids   = _get_lowest_uniques(events[i].cluster_id, tpe)
         goods = events[i][events[i].cluster_id.isin(ids)]
@@ -111,8 +117,17 @@ def from_frame(frame: pd.DataFrame,
         tracks = sortie.cluster_id
         train.append(sortie[order].values)
         target.append(utils.to_categorical(tracks.values, n_cat))
-    print("All finished. Loaded in {}.".format(min([len(events), nev])))
+    if event_range is None:
+        print("All finished. Loaded in {}.".format(min([len(events), nev])))
+    else:
+        print("All finished. Loaded in range [{}, {}].".format(*event_range))
     return _padded_train_and_target(train, target, preferred_rows)
+
+
+def _get_eligible_events(frame: pd.DataFrame, ts: int=-1):
+    ts = len(pd.unique(frame.r)) if (ts < 0) else ts
+    hits = frame[frame.r.isin(_get_lowest_uniques(frame.r, ts))]
+    return [event for (_, event) in hits.groupby("event_id")]
 
 
 def to_file(train: Train,

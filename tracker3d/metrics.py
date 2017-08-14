@@ -12,7 +12,7 @@ Grammar: Python 3.6.1
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple
-from .tracker_types import PMatrix, Target, Train
+from .tracker_types import PMatrix, Target, Train, Event
 from . import utils
 
 
@@ -387,7 +387,10 @@ def accuracy_vs_tracks_boxplot(guesses: Target,
         plt.figure()
         plt.xlabel("Number of Tracks")
         plt.ylabel("Discrete Accuracy")
-        plt.boxplot(boxes)
+        plt.title("Accuracy vs # of Tracks")
+        plt.boxplot(boxes, showfliers=False)
+        plt.xticks([i for i in range(len(boxes))], [i-1 for i in range(len(boxes))])
+
         plt.show()
     return tracks, acc
 
@@ -486,9 +489,17 @@ def threshold_boxplot(guesses: Target,
 
     if plot:
         plt.figure()
-        plt.boxplot(accuracies)
+        plt.boxplot(accuracies, showfliers=False)
         plt.xlabel("Threshold Value")
-        plt.ylabel("Metric")
+        plt.ylabel("Probability")
+        if variation == "correct":
+            plt.title("Prob[Hit assigned correctly with at least threshold certainty]")
+        elif variation == "incorrect":
+            plt.title("Prob[Hit assigned incorrectly with at least threshold certainty]")
+        elif variation == "many":
+            plt.title("Prob[Hit assigned to multiple tracks with at least threshold certainty]")
+        elif variation == "none":
+            plt.title("Prob[Hit assigned to no track with at least threshold certainty]")
         plt.xticks(range(1, 1 + len(thresholds)), thresholds)
         plt.show()
     return accuracies
@@ -528,3 +539,33 @@ def avg_accuracy_vs_track_scatter(guesses: Target,
         plt.show()
 
     return track, out_accuracy
+
+
+def number_of_crossings(event: Event,
+                        guesses: PMatrix,
+                        order: Tuple[str, str, str])\
+        -> int:
+    # Get list of float pairs such that each pair corresponds to a unique track
+    # pair[0] is equal to the phi of the lowest radius hit.
+    # pair[1] is equal to the phi of the highest radius hit.
+    tracks = [[] for _ in range(guesses.shape[1])]
+    cats   = utils.from_categorical(guesses)
+    for i, hit in enumerate(event):
+        tracks[cats[i]].append(hit)
+    r_idx   = order.index("r")
+    phi_idx = order.index("phi")
+    tracks  = [sorted(track, key=lambda x: x[r_idx]) for track in tracks]
+    phis    = [(track[0][phi_idx], track[-1][phi_idx])
+               for track in tracks if track]
+    phis    = [(phi[0] % (np.pi * 2), phi[1] % (np.pi * 2)) for phi in phis]
+    phis    = [(phi[0], phi[1] + (2 * np.pi if phi[0] > phi[1] else 0))
+               for phi in phis]
+
+    # Calculate the number of crossings.
+    crosses = 0
+    for x in range(len(phis)):
+        for y in range(x + 1, len(phis)):
+            low  = (phis[x][0] < phis[y][0])
+            high = (phis[x][1] < phis[y][1])
+            crosses += (low != high)
+    return crosses

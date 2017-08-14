@@ -16,7 +16,7 @@ def make_bank(source: pd.DataFrame,
     groups = source.groupby(["event_id", "cluster_id"])
     tracks = [track for (_, track) in groups if len(track) > 1]
     sample = random.choices(population=tracks, k=number_of_tracks)
-    bank : pd.DataFrame = pd.concat(sample)  # pycharm no type check pd.concat.
+    bank: pd.DataFrame = pd.concat(sample)  # pycharm no type check pd.concat.
     return bank
 
 
@@ -52,24 +52,34 @@ def generate(logistics: Sequence[Sequence[int]],
                 # Randomly rotate track about origin.
                 phi = np.random.uniform(-np.pi, np.pi)
                 rot = np.array([[np.cos(phi), -np.sin(phi)],
-                                 [np.sin(phi), np.cos(phi)]])
+                                [np.sin(phi),  np.cos(phi)]])
                 coordinates = np.array([track["x"], track["y"]]).T @ rot
-                track["cluster_id"] = i
-                track["event_id"]   = event_id
-                track["x"]          = coordinates[:, 0]
-                track["y"]          = coordinates[:, 1]
-                generated.append(track)
+                new_track = pd.DataFrame(data={
+                    "event_id": event_id,
+                    "cluster_id": i,
+                    "x": coordinates[:, 0],
+                    "y": coordinates[:, 1]
+                })
+                generated.append(new_track)
             event_id += 1
-            print("\rGenerated {}".format(event_id), end="")
+        print("\rGenerated {}".format(event_id), end="")
     print("")
     frame: pd.DataFrame = pd.concat(generated)
     frame: pd.DataFrame = frame[["event_id", "cluster_id", "x", "y"]]
-    return frame.sample(frac=1).drop_duplicates()
+    return frame.drop_duplicates().sample(frac=1).reset_index(drop=True)
 
 if __name__ == '__main__':
     print("Starting program.")
     ramp = pd.read_csv("../datasets/raw/ramp.csv")
-    dist = [(200, i) for i in range(1, 1 + 22)]
+    dist = [(175, i) for i in range(1, 1 + 50)]
     gen  = generate(logistics=dist, bank=ramp)
     gen.to_csv("../datasets/raw/generated.csv")
+
+    counts = [0 for _ in range(100)]
+    groups = gen.groupby("event_id")
+    for group in [g for (_, g) in groups]:
+        counts[len(pd.unique(group["cluster_id"]))] += 1
+    for i, count in enumerate(counts):
+        if count != 0:
+            print("Created {0} events with {1} tracks.".format(count, i))
     print("Ending program.")
