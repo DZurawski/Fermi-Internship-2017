@@ -47,7 +47,6 @@ def number_of_tracks(
     return frame.groupby(["event_id", "cluster_id"]).size().max()
 
 
-
 def number_of_crossings(
         frame : pd.DataFrame,
         order : List[str],

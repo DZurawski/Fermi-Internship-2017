@@ -101,6 +101,27 @@ def input_output_generator(
         yield (np.array(in_), np.array(out_))
 
 
+def reindex_event_ids(
+        frame : pd.DataFrame
+        ) -> None:
+    frame = frame.copy()
+    ids   = frame["event_id"].sort_values()
+    dic   = dict((event_id, i) for i, event_id in enumerate(ids))
+    frame["event_id"] = frame["event_id"].map(dic)
+
+
+def reindex_cluster_ids(
+        frame : pd.DataFrame
+        ) -> None:
+    events = utils.list_of_groups(frame, group="event_id")
+    for event in events:
+        idx  = event.groupby("cluster_id")["r"].transform(min) == event["r"]
+        lows = event[idx].sort_values(["phi", "z", "r"])
+        dic  = dict((id_, i) for i, id_ in enumerate(lows["cluster_id"]))
+        event["cluster_id"] = event["cluster_id"].map(dic)
+    return np.concat(events)
+
+
 def prepare_frame(
         frame    : pd.DataFrame,
         n_rows   : int = -1,
@@ -126,7 +147,6 @@ def prepare_frame(
     n_rows   = metrics.number_of_hits(frame) + n_noise if n_rows < 0 else n_rows
     for event_id, event in enumerate(events):
         # Map track ids to indices within a probability matrix.
-        print(event_id)
         idx    = event.groupby("cluster_id")["r"].transform(min) == event["r"]
         lows   = event[idx].sort_values(["phi", "z", "r"])
         id2idx = dict((id_, i) for i, id_ in enumerate(lows["cluster_id"]))
@@ -138,6 +158,7 @@ def prepare_frame(
             "z"          : tuple(event["z"]),
             "noise"      : tuple([False for _ in range(len(event))]),
             "padding"    : tuple([False for _ in range(len(event))]), })
+        print(clean["cluster_id"])
         n_padding = n_rows - len(clean) - n_noise
         cleans.append(make_noise(clean, n_tracks, event_id, n_noise))
         cleans.append(make_padding(n_tracks + 1, event_id, n_padding))
