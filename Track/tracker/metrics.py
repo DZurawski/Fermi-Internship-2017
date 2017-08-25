@@ -44,7 +44,7 @@ def number_of_tracks(
         frame = utils.remove_padding(frame)
     if {"noise"}.issubset(frame.columns) and not noise_counts_as_a_track:
         frame = utils.remove_noise(frame)
-    return frame.groupby(["event_id", "cluster_id"]).size().max()
+    return len(frame.groupby(["event_id", "cluster_id"]))
 
 
 def number_of_crossings(
@@ -143,7 +143,7 @@ def percent_of_events_with_correct_number_of_tracks(
     for i in range(len(frames)):
         guess  = utils.from_categorical(guesses[i])
         target = ext.extract_output(frames[i], order, categorical=False)
-        n_correct = len(np.unique(guess)) == len(np.unique(target))
+        n_correct += (len(np.unique(guess)) == len(np.unique(target)))
     return n_correct / len(frames)
 
 
@@ -162,22 +162,25 @@ def percent_of_tracks_assigned_correctly(
                 do_not_factor_in_padding, do_not_factor_in_noise)
     n_tracks, n_correct = 0, 0
     for i, guess in enumerate(guesses):
+        frame = frames[i]
         guess  = discrete(guess)
-        frame  = frames[i]
+        target = ext.extract_output(frame, order)
         if do_not_factor_in_padding:
-            guess = utils.remove_padding(frame, guess, order)
-            frame = utils.remove_padding(frame)
+            guess  = utils.remove_padding(frame, guess,  order)
+            target = utils.remove_padding(frame, target, order)
+            frame  = utils.remove_padding(frame)
         if do_not_factor_in_noise:
-            guess = utils.remove_noise(frame, guess, order)
-            frame = utils.remove_noise(frame)
-        target = ext.extract_output(frame, order).transpose()
+            guess  = utils.remove_noise(frame, guess,  order)
+            target = utils.remove_noise(frame, target, order)
+        target = target.transpose()
         guess  = guess.transpose()
         for r in range(len(target)):
             track = 0
             for c in range(len(target[r])):
-                track += (target[r, c] == 1 and guess[r, c] == 1)
-            n_correct += (percent <= (track / len(target[r])))
-        n_tracks += len(guess)
+                track += ((target[r, c] == 1) and (guess[r, c] == 1))
+            print("{0}, {1}".format(track, percent * len(target)))
+            n_correct += ((percent * len(target)) <= track)
+            n_tracks += 1
     return n_correct / n_tracks
 
 
