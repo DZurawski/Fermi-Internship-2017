@@ -178,7 +178,6 @@ def percent_of_tracks_assigned_correctly(
             track = 0
             for c in range(len(target[r])):
                 track += ((target[r, c] == 1) and (guess[r, c] == 1))
-            print("{0}, {1}".format(track, percent * len(target)))
             n_correct += ((percent * len(target)) <= track)
             n_tracks += 1
     return n_correct / n_tracks
