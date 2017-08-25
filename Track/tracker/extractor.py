@@ -3,6 +3,7 @@
 
 import numpy as np
 import pandas as pd
+import random
 from typing import List, Tuple, Union, Any
 from . import utils, metrics
 
@@ -79,9 +80,10 @@ def extract_output(
 
 
 def input_output_generator(
-        events : List[pd.DataFrame],
-        batch  : int,
-        order  : List[str],
+        events  : List[pd.DataFrame],
+        batch   : int,
+        order   : List[str],
+        shuffle : bool = True,
         ) -> Tuple[np.ndarray, np.ndarray]:
     """ A input-output generator for a model.
     :param events:
@@ -93,12 +95,14 @@ def input_output_generator(
     :return:
         Yields a tuple of input-output data.
     """
-    i = 0
     while True:
-        in_  = [extract_input(event, order) for event in events[i:i+batch]]
-        out_ = [extract_output(event, order) for event in events[i:i+batch]]
-        i    = (i + batch) if (i + batch < len(events)) else 0
-        yield (np.array(in_), np.array(out_))
+        if shuffle:
+            random.shuffle(events)
+        for i in range(0, len(events), batch):
+            b_idx  = i + batch
+            sample = events[i:b_idx] if b_idx < len(events) else events[i:]
+            yield (np.array([extract_input(event, order)  for event in sample]),
+                   np.array([extract_output(event, order) for event in sample]))
 
 
 def reindex_event_ids(
@@ -148,8 +152,9 @@ def prepare_frame(
     for event_id, event in enumerate(events):
         # Map track ids to indices within a probability matrix.
         idx    = event.groupby("cluster_id")["r"].transform(min) == event["r"]
-        lows   = event[idx].sort_values(["phi", "z", "r"])
-        id2idx = dict((id_, i) for i, id_ in enumerate(lows["cluster_id"]))
+        sort   = event[idx].sort_values(["phi", "z", "r"])
+        lows   = pd.unique(sort["cluster_id"])
+        id2idx = dict((id_, i) for i, id_ in enumerate(lows))
         clean  = pd.DataFrame(data={
             "event_id"   : tuple(event_id for _ in range(len(event))),
             "cluster_id" : tuple(event["cluster_id"].map(id2idx)),
@@ -158,7 +163,6 @@ def prepare_frame(
             "z"          : tuple(event["z"]),
             "noise"      : tuple([False for _ in range(len(event))]),
             "padding"    : tuple([False for _ in range(len(event))]), })
-        print(clean["cluster_id"])
         n_padding = n_rows - len(clean) - n_noise
         cleans.append(make_noise(clean, n_tracks, event_id, n_noise))
         cleans.append(make_padding(n_tracks + 1, event_id, n_padding))

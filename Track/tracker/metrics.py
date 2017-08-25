@@ -73,9 +73,10 @@ def distributions(
         (4 events with 5 tracks),
         (6 tracks with 1 track)
     """
-    frame  = utils.remove_noise(utils.remove_padding(frame))
+    if {"padding"}.issubset(frame.columns):
+        frame = utils.remove_noise(utils.remove_padding(frame))
     events = utils.list_of_groups(frame, group="event_id")
-    sizes  = np.array([event["cluster_id"].max() + 1 for event in events])
+    sizes  = np.array([number_of_tracks(event) for event in events])
     return tuple(np.unique(sizes, return_counts=True))
 
 
