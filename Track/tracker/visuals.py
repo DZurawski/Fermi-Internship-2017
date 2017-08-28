@@ -33,21 +33,24 @@ def display(
     table  = pd.DataFrame(ext.extract_input(frame, order), columns=order)
     target = ext.extract_output(frame, order).round(0)
     column = [chr(65+i) for i in range(target.shape[1] - 2)] + ["noise", "pad"]
-    if mode == "discrete pairs":
+    if mode == "guess":
+        out_table = pd.DataFrame(data=guess, columns=column).replace(0, "")
+        table = pd.concat([table, out_table], axis=1)
+    elif mode == "discrete pairs":
         guess = metrics.discrete(guess).round(0)
-        data = []
+        data  = []
         for x in range(len(guess)):
             row = []
             for y in range(len(guess[x])):
                 if target[x, y] == 0 and guess[x, y] == 0:
                     row.append("")
                 else:
-                    t, g = int(target[x, y]), guess[x, y]
+                    t, g = int(target[x, y]), int(guess[x, y])
                     row.append("`{0}`[{1}]".format(t, g))
             data.append(row)
         out_table = pd.DataFrame(data=data, columns=column)
         table = pd.concat([table, out_table], axis=1)
-    if mode == "pairs" and guess is not None:
+    elif mode == "pairs" and guess is not None:
         guess = guess.round(decimal)
         data   = []
         for x in range(len(guess)):
@@ -56,7 +59,7 @@ def display(
                 if target[x, y] == 0 and guess[x, y] == 0:
                     row.append("")
                 else:
-                    t, g = int(target[x, y]), guess[x, y]
+                    t, g = int(target[x, y]), np.round(guess[x, y], 2)
                     row.append("`{0}`[{1}]".format(t, g))
             data.append(row)
         out_table = pd.DataFrame(data=data, columns=column)
@@ -78,13 +81,30 @@ def boxplot(
         fliers : bool = False,
         xticks : Optional[List] = None,
         ) -> None:
+    """ Create a box plot diagram from the provided data.
+    :param data:
+        A list of 1D arrays such that each array contains the floating point
+        data for one of the box plots.
+    :param title:
+        The title of the box plot.
+    :param xlabel:
+        The x axis label of the box plot.
+    :param ylabel:
+        The y axis label of the box plot.
+    :param fliers:
+        True if outlier points should be displayed.
+    :param xticks:
+        The x axis ticks that label each box plot.
+    :return:
+        None
+    """
     plt.figure()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.boxplot(data, showfliers=fliers)
     if xticks is not None:
-        plt.xticks([i for i in range(len(data))], xticks)
+        plt.xticks([i for i in range(1, len(data) + 1)], xticks)
 
 
 class Plot2D:
@@ -95,7 +115,18 @@ class Plot2D:
             order : List[str],
             guess : Optional[np.ndarray] = None,
             ) -> None:
-        """ Initialize member variables for the plot. """
+        """ Initialize a 2D plot.
+        :param frame:
+            The frame containing a single event's data.
+        :param order:
+            The ordering of the frame.
+        :param guess:
+            The prediction assignment for the hits to a track. If this is
+            None, then the hits will be assigned to tracks based on their
+            correct assignment.
+        :return:
+            None
+        """
         guess    = ext.extract_output(frame, order) if guess is None else guess
         guess_id = utils.from_categorical(guess)
         frame    = frame.sort_values(order)
@@ -112,7 +143,18 @@ class Plot2D:
             mode  : str,
             title : str = "",
             ) -> None:
-        """ Plot this 3D plot. """
+        """ Plot this plot.
+        :param mode:
+            The axes to plot. One of {"xy", "xz", "yz", "zr"}.
+            "xy" projects the data onto the XY plane.
+            "xz" projects the data onto the XZ plane.
+            "yz" projects the data onto the YZ plane.
+            "zr" projects the data onto the ZR plane, where r = sqrt(x*x+y*y)
+        :param title:
+            The title of the plot.
+        :return:
+            None
+        """
         mode   = mode.lower()
         tracks = utils.list_of_groups(self.frame, group="guess_id")
         for i, track in enumerate(tracks):
@@ -150,8 +192,10 @@ class Plot2D:
         elif mode == "zr":
             self.ax.set_xlabel("Z")
             self.ax.set_ylabel("R")
+            min_z = self.frame["z"].min()
+            max_z = self.frame["z"].max()
             for r in pd.unique(self.frame["r"]):
-                self.ax.plot([-200, 200], [r, r], alpha=0.1, color="black")
+                self.ax.plot([min_z, max_z], [r, r], alpha=0.1, color="black")
         self.leg = self.ax.legend(loc='upper right', fancybox=True)
         plt.show(self.ax)
 
@@ -160,6 +204,19 @@ class Plot2D:
             values : np.ndarray,
             mode : str,
             ) -> np.ndarray:
+        """ Retrieve the appropriate x and y coordinates for each point.
+        :param values:
+            An 2D array of shape (None, 3) such that each row contains
+            phi, r and z values.
+        :param mode:
+            The way in which values should be extracted. For this parameter,
+            just put in the mode that was specified upon this object's
+            construction.
+        :return:
+            A 2D array of shape (None, 2) such that the first column
+            contains all the x values and the second column contains all the
+            y values necessary for plotting.
+        """
         mode = mode.lower()
         ps   = values[:, self.order.index("phi")]
         zs   = values[:, self.order.index("z")]
@@ -184,7 +241,18 @@ class Plot3D:
             order : List[str],
             guess : Optional[np.ndarray] = None,
             ) -> None:
-        """ Initialize member variables for the plot. """
+        """ Initialize a 3D plot.
+        :param frame:
+            The frame containing a single event's data.
+        :param order:
+            The ordering of the frame.
+        :param guess:
+            The prediction assignment for the hits to a track. If this is
+            None, then the hits will be assigned to tracks based on their
+            correct assignment.
+        :return:
+            None
+        """
         guess    = ext.extract_output(frame, order) if guess is None else guess
         guess_id = utils.from_categorical(guess)
         frame    = frame.sort_values(order)
@@ -203,7 +271,18 @@ class Plot3D:
             y_limits : Tuple[int, int] = (-1000, 1000),
             z_limits : Tuple[int, int] = (-200,   200),
             ) -> None:
-        """ Plot this 3D plot. """
+        """ Plot this plot.
+        :param title:
+            The title of the plot.
+        :param x_limits:
+            The maximum x boundaries
+        :param y_limits:
+            The maximum y boundaries
+        :param z_limits:
+            The maximum z boundaries
+        :return:
+            None
+        """
         tracks = utils.list_of_groups(self.frame, group="guess_id")
         for i, track in enumerate(tracks):
             guess_id = track.iloc[0]["guess_id"]
@@ -238,7 +317,15 @@ class Plot3D:
             self,
             values : np.ndarray,
             ) -> np.ndarray:
-        """ Transform 'phi', 'z', 'r' coordinates to cartesian coordinates. """
+        """  Transform 'phi', 'z', 'r' coordinates to cartesian coordinates.
+        :param values:
+            An array of shape (None, 3) that contain the array of
+            phi, z, r values.
+        :return:
+            An array of shape (None, 3) such that the first column contains all
+            the x values, the second column contains all the y values and the
+            third column contains all the z values.
+        """
         ps = values[:, self.order.index("phi")]
         zs = values[:, self.order.index("z")]
         rs = values[:, self.order.index("r")]

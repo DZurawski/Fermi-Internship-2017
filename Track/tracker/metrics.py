@@ -42,6 +42,7 @@ def number_of_tracks(
     """
     if {"padding"}.issubset(frame.columns):
         frame = utils.remove_padding(frame)
+    # noinspection PyTypeChecker
     if {"noise"}.issubset(frame.columns) and not noise_counts_as_a_track:
         frame = utils.remove_noise(frame)
     return len(frame.groupby(["event_id", "cluster_id"]))
@@ -97,7 +98,15 @@ def threshold(
         matrix : np.ndarray,
         thresh : float
         ) -> np.ndarray:
-    """ Get a discrete matrix such that values above threshold are 1'd. """
+    """ Get a discrete matrix such that values above threshold are 1'd.
+    :param matrix:
+        The input matrix
+    :param thresh:
+        A threshold value. Values below this are 0'd. Values greater than or
+        equal to this are made into 1's.
+    :return:
+        The threshold matrix.
+    """
     threshold_matrix = np.copy(matrix)
     threshold_matrix[thresh >  matrix] = 0
     threshold_matrix[thresh <= matrix] = 1
@@ -111,7 +120,22 @@ def percent_of_hits_assigned_correctly(
         do_not_factor_in_padding : bool = True,
         do_not_factor_in_noise   : bool = False,
         ) -> float:
-    """ Get the percent of hits that were assigned to the correct track. """
+    """ Get the percent of hits that were assigned to the correct track.
+    :param frames:
+        A list of frames.
+    :param guesses:
+        A list of prediction matrices
+    :param order:
+        A permutation of ("phi", "r", "z")
+    :param do_not_factor_in_padding:
+        If True, then do not factor in the correct or incorrect categorization
+        of padding.
+    :param do_not_factor_in_noise:
+        If True, then do not factor in the correct or incorrect categorization
+        of noise.
+    :return:
+        The percent of hits that were assigned to the correct track.
+    """
     if isinstance(frames, pd.DataFrame):
         return percent_of_hits_assigned_correctly(
                 [frames], [guesses], order,
@@ -137,6 +161,18 @@ def percent_of_events_with_correct_number_of_tracks(
         guesses : List[np.ndarray],
         order   : List[str],
         ) -> float:
+    """ Return the percent of events with the correct number of tracks.
+    :param frames:
+        A list of data frames, each corresponding to an event.
+    :param guesses:
+        A list of probability matrices
+    :param order:
+        A permutation of ("phi", "r", "z")
+    :return:
+        The percent of events such that the number of tracks within that event's
+        corresponding guess is equal to the number of tracks that this event
+        truly has.
+    """
     if isinstance(frames, pd.DataFrame):
         return percent_of_tracks_assigned_correctly(
                 utils.list_of_groups(frames, "event_id"), guesses, order)
@@ -176,11 +212,13 @@ def percent_of_tracks_assigned_correctly(
         target = target.transpose()
         guess  = guess.transpose()
         for r in range(len(target)):
-            track = 0
-            for c in range(len(target[r])):
-                track += ((target[r, c] == 1) and (guess[r, c] == 1))
-            n_correct += ((percent * len(target)) <= track)
-            n_tracks += 1
+            if target[r].sum() > 0:
+                track, length = 0, 0
+                for c in range(len(target[r])):
+                    track  += (target[r, c] and guess[r, c])
+                    length += target[r, c]
+                n_correct += ((percent * length) <= track)
+                n_tracks  += 1
     return n_correct / n_tracks
 
 

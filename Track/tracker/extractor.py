@@ -92,6 +92,9 @@ def input_output_generator(
         How many instances of input-output to output per yield.
     :param order:
         A permutation of ["phi", "r", "z"]
+    :param shuffle:
+        True if the function should shuffle the list of events after each
+        epoch. False if no shuffling should occur.
     :return:
         Yields a tuple of input-output data.
     """
@@ -101,7 +104,7 @@ def input_output_generator(
         for i in range(0, len(events), batch):
             b_idx  = i + batch
             sample = events[i:b_idx] if b_idx < len(events) else events[i:]
-            yield (np.array([extract_input(event, order)  for event in sample]),
+            yield (np.array([extract_input(event,  order) for event in sample]),
                    np.array([extract_output(event, order) for event in sample]))
 
 
