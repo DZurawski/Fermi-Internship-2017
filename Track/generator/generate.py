@@ -1,5 +1,4 @@
 """
-
 """
 
 import numpy as np
@@ -70,16 +69,22 @@ def generate(logistics: Sequence[Sequence[int]],
 
 if __name__ == '__main__':
     print("Starting program.")
-    ramp = pd.read_csv("../datasets/raw/RAMP.csv")
-    dist = [(1000, i) for i in range(1, 51)]
-    gen  = generate(logistics=dist, bank=ramp)
-    gen.to_csv("../datasets/raw/generated.csv")
+    np.random.seed(7)
+    dist = [0 for _ in range(25)]
+    for value in np.random.normal(loc=13, scale=4, size=25000).astype(int):
+        if value < 1:
+            dist[0] += 1
+        elif value >= 25:
+            dist[24] += 1
+        else:
+            dist[value] += 1
+    dist = [(val, i + 1) for i, val in enumerate(dist)]
 
-    # counts = [0 for _ in range(100)]
-    # groups = gen.groupby("event_id")
-    # for group in [g for (_, g) in groups]:
-    #     counts[len(pd.unique(group["cluster_id"]))] += 1
-    # for i, count in enumerate(counts):
-    #     if count != 0:
-    #         print("Created {0} events with {1} tracks.".format(count, i))
+    print("Reading CSV.")
+    ramp = pd.read_csv("../data/sets/progenitors/RAMP.gz")
+    # dist = [(1650 - 50 * (25 - i + 1), i) for i in range(1, 1 + 25)]
+    print("Generating the Data.")
+    gen  = generate(logistics=dist, bank=ramp)
+    print("Compressing and saving to file.")
+    gen.to_csv("../data/sets/generated.csv")
     print("Ending program.")
