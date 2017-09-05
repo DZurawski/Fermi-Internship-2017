@@ -70,15 +70,7 @@ def generate(logistics: Sequence[Sequence[int]],
 if __name__ == '__main__':
     print("Starting program.")
     np.random.seed(7)
-    dist = [0 for _ in range(25)]
-    for value in np.random.normal(loc=13, scale=4, size=25000).astype(int):
-        if value < 1:
-            dist[0] += 1
-        elif value >= 25:
-            dist[24] += 1
-        else:
-            dist[value] += 1
-    dist = [(val, i + 1) for i, val in enumerate(dist)]
+    dist = [(1000, i) for i in range(1, 51)]
 
     print("Reading CSV.")
     ramp = pd.read_csv("../data/sets/progenitors/RAMP.gz")

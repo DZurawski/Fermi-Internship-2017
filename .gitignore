@@ -2,3 +2,6 @@ Track/data/sets
 Track/data/images
 Track/.ipynb_checkpoints
 Track/tracker/__pycache__
+Track/scratchpad.ipynb
+Track/generator/.RData
+Track/generator/.Rhistory

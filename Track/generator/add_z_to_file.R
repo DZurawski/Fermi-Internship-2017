@@ -9,7 +9,7 @@ require("tidyr")
 require("dplyr")
 
 in_filename   <- "../data/sets/generated.csv"
-out_filename  <- "../data/sets/NORM-25000E-Z.csv"
+out_filename  <- "../data/sets/UNIF50-50000E-Z.csv"
 z.bounds      <- c(-200, 200) # What should the min and max z values be?
 initial.frame <- read.csv(in_filename) %>%
                     mutate(phi = atan2(y, x)) %>%                
