@@ -240,9 +240,8 @@ def threshold_metrics(
             threshold matrix.
     """
     # Remove the padding column, if necessary.
+    target = utils.remove_padding(frame, ext.extract_output(frame, order), order)
     guess  = utils.remove_padding(frame, guess, order)
-    frame  = utils.remove_padding(frame)
-    target = ext.extract_output(frame, order)
     n_hits = number_of_hits(frame)
     matrix = threshold(guess, thresh)
     stack  = np.dstack((target, matrix)).transpose((0, 2, 1))
