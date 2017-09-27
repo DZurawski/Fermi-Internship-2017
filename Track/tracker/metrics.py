@@ -7,8 +7,9 @@ Grammar: Python 3.6.1
 
 import numpy as np
 import pandas as pd
-from typing import List, Union, Tuple, Optional
+from typing import List, Union, Tuple
 from . import extractor as ext, utils
+import math
 
 
 def number_of_hits(
@@ -50,11 +51,20 @@ def number_of_tracks(
 
 def number_of_crossings(
         frame : pd.DataFrame,
-        order : List[str],
-        guess : Optional[np.ndarray] = None,
-        ) -> float:
-    # TODO
-    return -1
+        ) -> int:
+    """ Return the number of times two separate tracks cross each other within
+    this event.
+    :param frame: A pd.DataFrame representing an event of many tracks.
+    :return: The number of times two separate tracks cross each other within
+    this frame's event.
+    """
+    frame   = utils.remove_noise(utils.remove_padding(frame))
+    tracks  = utils.list_of_groups(frame, "cluster_id")
+    crosses = 0
+    for i in range(len(tracks)):
+        for j in range((i + 1), len(tracks)):
+            crosses += tracks_crossed(tracks[i], tracks[j])
+    return crosses
 
 
 def distributions(
@@ -240,7 +250,8 @@ def threshold_metrics(
             threshold matrix.
     """
     # Remove the padding column, if necessary.
-    target = utils.remove_padding(frame, ext.extract_output(frame, order), order)
+    out    = ext.extract_output(frame, order)
+    target = utils.remove_padding(frame, out, order)
     guess  = utils.remove_padding(frame, guess, order)
     n_hits = number_of_hits(frame)
     matrix = threshold(guess, thresh)
@@ -285,3 +296,121 @@ def accuracy_vs_thresholds(
     accuracy = [[threshold_metrics(frames[i], guesses[i], thresh, order)
                  for i in range(len(frames))] for thresh in threshes]
     return np.array(threshes), np.array(accuracy).transpose()[index]
+
+
+def accuracy_vs_bend(
+        frames  : Union[pd.DataFrame, List[pd.DataFrame]],
+        guesses : List[np.ndarray],
+        order   : List[str],
+        bends   : List[float],
+        ) -> Tuple[np.ndarray, np.ndarray]:
+    if isinstance(frames, pd.DataFrame):
+        groups = utils.list_of_groups(frames, "event_id")
+        return accuracy_vs_bend(groups, guesses, order, bends)
+    accuracies = []
+    for f, frame in enumerate(frames):
+        tracks = utils.list_of_groups(frame, "cluster_id")
+        guess  = discrete(guesses[f])
+        matrix = ext.extract_output(frame, order)
+        common = np.logical_and(guess, matrix).sum(axis=1)
+        track_lengths = matrix.sum(axis=1)
+        for t, track in enumerate(tracks):
+            if track["noise"].any() or track["padding"].any():
+                continue
+            low_phi   = track[track["r"].idxmin()]["phi"]
+            high_phi  = track[track["r"].idxmax()]["phi"]
+            phi_delta = change_in_phi(low_phi, high_phi)
+            low_r     = track["r"].min()
+            high_r    = track["r"].max()
+            r_delta   = np.abs(high_r - low_r)
+            bend      = (phi_delta / r_delta) if r_delta != 0 else 0
+            accuracy  = common[t] / track_lengths[t]
+            index = 0
+            for j, b in enumerate(bends):
+                if bend >= b:
+                    index = j
+                    break
+            accuracies[index].append(accuracy)
+    return np.array(bends), np.array(accuracies)
+
+
+def change_in_phi(
+        phi_1 : float,
+        phi_2 : float,
+        ) -> float:
+    """ Calculate the change in phi between phi_1 and phi_2.
+    :param phi_1: An angle in radians.
+    :param phi_2: An angle in radians.
+    :return: The shortest angle in radians between phi_1 and phi_2.
+    """
+    phi_1 = phi_1 % (2 * np.pi)
+    phi_2 = phi_2 % (2 * np.pi)
+
+    if phi_1 > phi_2:
+        phi_1, phi_2 = phi_2, phi_1
+
+    if (phi_2 - phi_1) > np.pi:  # Calculating change in wrong direction.
+        return change_in_phi(phi_1 + np.pi, phi_2 + np.pi)
+    else:
+        return phi_2 - phi_1
+
+
+def phi_is_between(
+        phi_low  : float,
+        phi_high : float,
+        phi_mid  : float,
+        ) -> bool:
+    """ Return True if phi_mid is between phi_low and phi_high.
+    :param phi_low: An angle in radians.
+    :param phi_high: An angle in radians.
+    :param phi_mid: An angle in radians.
+    :return: True if phi_mid lies on the shortest arc between phi_low and
+        phi_high. False otherwise.
+    """
+    low_to_mid  = change_in_phi(phi_low, phi_mid)
+    mid_to_high = change_in_phi(phi_mid, phi_high)
+    low_to_high = change_in_phi(phi_low, phi_high)
+    return math.isclose(low_to_mid + mid_to_high, low_to_high)
+
+
+def tracks_crossed(
+        track_1: pd.DataFrame,
+        track_2: pd.DataFrame,
+        ) -> bool:
+    """ Return True if these two tracks cross each other.
+    :param track_1: A pd.DataFrame representing a track.
+    :param track_2: A pd.DataFrame representing a track.
+    :return: True if these two tracks cross each other. False otherwise.
+    """
+    if len(track_1) <= 1 or len(track_2) <= 1:
+        return False
+
+    # Grab the unique radiuses that are used by each tracks' hits.
+    track_1_r = np.sort(track_1["r"].unique())
+    track_2_r = np.sort(track_2["r"].unique())
+
+    # Find a starting points for the max and min r values.
+    max_r = np.min([track_1_r.max(), track_2_r.max()])
+    min_r = np.max([track_1_r.min(), track_2_r.min()])
+
+    # Define the minimum and maximum radiuses to compare phi values on.
+    # Accounts for case when a track is not full.
+    low_r_1  = track_1_r[np.searchsorted(track_1_r, min_r)]
+    low_r_2  = track_2_r[np.searchsorted(track_2_r, min_r)]
+    high_r_1 = track_1_r[np.searchsorted(track_1_r, max_r)]
+    high_r_2 = track_2_r[np.searchsorted(track_2_r, max_r)]
+
+    # Find the phis used for comparing if a track crosses another track.
+    low_phi_1  = track_1[track_1["r"] ==  low_r_1]["phi"].min() % (2 * np.pi)
+    low_phi_2  = track_2[track_2["r"] ==  low_r_2]["phi"].min() % (2 * np.pi)
+    high_phi_1 = track_1[track_1["r"] == high_r_1]["phi"].max() % (2 * np.pi)
+    high_phi_2 = track_2[track_2["r"] == high_r_2]["phi"].max() % (2 * np.pi)
+    answer     = (low_phi_1  <= low_phi_2) != (high_phi_1 <= high_phi_2)
+
+    # Adjust for lines that cross the 0 radians line.
+    answer *= not ((2 * low_phi_1  < np.pi) and (2 * high_phi_1 > 3 * np.pi))
+    answer *= not ((2 * high_phi_1 < np.pi) and (2 * low_phi_1  > 3 * np.pi))
+    answer *= not ((2 * low_phi_2  < np.pi) and (2 * high_phi_2 > 3 * np.pi))
+    answer *= not ((2 * high_phi_2 < np.pi) and (2 * low_phi_2  > 3 * np.pi))
+
+    return answer
