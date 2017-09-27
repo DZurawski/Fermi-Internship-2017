@@ -343,16 +343,8 @@ def change_in_phi(
     :param phi_2: An angle in radians.
     :return: The shortest angle in radians between phi_1 and phi_2.
     """
-    phi_1 = phi_1 % (2 * np.pi)
-    phi_2 = phi_2 % (2 * np.pi)
-
-    if phi_1 > phi_2:
-        phi_1, phi_2 = phi_2, phi_1
-
-    if (phi_2 - phi_1) > np.pi:  # Calculating change in wrong direction.
-        return change_in_phi(phi_1 + np.pi, phi_2 + np.pi)
-    else:
-        return phi_2 - phi_1
+    angle = np.abs(phi_1 % (2 * np.pi) - phi_2 % (2 * np.pi))
+    return angle if (angle < np.pi) else (2 * np.pi - angle)
 
 
 def phi_is_between(
