@@ -1,0 +1,1 @@
+<class 'theano.tensor.var.TensorVariable'>

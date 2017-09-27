@@ -285,7 +285,7 @@ class Plot3D:
         """
         tracks = utils.list_of_groups(self.frame, group="guess_id")
         for i, track in enumerate(tracks):
-            guess_id = track.iloc[0]["guess_id"]
+            guess_id = int(track.iloc[0]["guess_id"])
             label  = chr(65 + guess_id)
             values = self.cartesian(ext.extract_input(track, self.order))
             self.ax.scatter3D(
