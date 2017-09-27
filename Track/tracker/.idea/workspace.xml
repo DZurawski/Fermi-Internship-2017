@@ -13,40 +13,14 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="FileEditorManager">
-    <leaf SIDE_TABS_SIZE_LIMIT_KEY="450">
-      <file leaf-file-name="visuals.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/visuals.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="0">
-              <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding>
-                <marker date="1506520399850" expanded="true" signature="8563:12273" ph="..." />
-                <marker date="1506520399850" expanded="true" signature="9864:11501" ph="..." />
-                <marker date="1506520399850" expanded="true" signature="10853:11119" ph="..." />
-                <marker date="1506520399850" expanded="true" signature="11601:12273" ph="..." />
-                <marker date="1506520399850" expanded="true" signature="11610:12036" ph="&quot;&quot;&quot;...&quot;&quot;&quot;" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="metrics.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/metrics.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="365">
-              <caret line="346" column="40" lean-forward="true" selection-start-line="346" selection-start-column="40" selection-end-line="346" selection-end-column="40" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-    </leaf>
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="450" />
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
       <find>min</find>
       <find>max</find>
       <find>cro</find>
+      <find>bend</find>
     </findStrings>
     <replaceStrings>
       <replace>low</replace>
@@ -104,7 +78,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-12" y="-12" width="1944" height="1034" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -134,17 +107,18 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/metrics.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/visuals.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <marker date="1506520399850" expanded="true" signature="8563:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="9864:11501" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="10853:11119" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11601:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11610:12036" ph="&quot;&quot;&quot;...&quot;&quot;&quot;" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -160,13 +134,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <marker date="1506520399850" expanded="true" signature="8563:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="9864:11501" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="10853:11119" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11601:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11610:12036" ph="&quot;&quot;&quot;...&quot;&quot;&quot;" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -182,34 +149,20 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <marker date="1506520399850" expanded="true" signature="8563:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="9864:11501" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="10853:11119" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11601:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11610:12036" ph="&quot;&quot;&quot;...&quot;&quot;&quot;" />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/visuals.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
+        <state relative-caret-position="-4059">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <marker date="1506520399850" expanded="true" signature="8563:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="9864:11501" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="10853:11119" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11601:12273" ph="..." />
-            <marker date="1506520399850" expanded="true" signature="11610:12036" ph="&quot;&quot;&quot;...&quot;&quot;&quot;" />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/metrics.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="365">
-          <caret line="346" column="40" lean-forward="true" selection-start-line="346" selection-start-column="40" selection-end-line="346" selection-end-column="40" />
+        <state relative-caret-position="-568">
+          <caret line="300" column="20" lean-forward="false" selection-start-line="300" selection-start-column="16" selection-end-line="300" selection-end-column="20" />
           <folding />
         </state>
       </provider>

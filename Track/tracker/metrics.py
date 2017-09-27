@@ -307,29 +307,27 @@ def accuracy_vs_bend(
     if isinstance(frames, pd.DataFrame):
         groups = utils.list_of_groups(frames, "event_id")
         return accuracy_vs_bend(groups, guesses, order, bends)
-    accuracies = []
+    bends = sorted(bends)
+    accuracies = [[] for _ in bends]
     for f, frame in enumerate(frames):
         tracks = utils.list_of_groups(frame, "cluster_id")
         guess  = discrete(guesses[f])
         matrix = ext.extract_output(frame, order)
-        common = np.logical_and(guess, matrix).sum(axis=1)
-        track_lengths = matrix.sum(axis=1)
+        common = np.logical_and(guess, matrix).sum(axis=0)
+        track_lengths = matrix.sum(axis=0)
         for t, track in enumerate(tracks):
             if track["noise"].any() or track["padding"].any():
                 continue
-            low_phi   = track[track["r"].idxmin()]["phi"]
-            high_phi  = track[track["r"].idxmax()]["phi"]
+            low_phi   = track[track["r"] == track["r"].min()]["phi"].min()
+            high_phi  = track[track["r"] == track["r"].max()]["phi"].min()
             phi_delta = change_in_phi(low_phi, high_phi)
             low_r     = track["r"].min()
             high_r    = track["r"].max()
             r_delta   = np.abs(high_r - low_r)
-            bend      = (phi_delta / r_delta) if r_delta != 0 else 0
+            bend      = ((phi_delta / r_delta) if r_delta != 0 else 0)
+            bend      = np.round(bend * 1000000, 0).astype(int)
             accuracy  = common[t] / track_lengths[t]
-            index = 0
-            for j, b in enumerate(bends):
-                if bend >= b:
-                    index = j
-                    break
+            index     = np.searchsorted(bends, bend)
             accuracies[index].append(accuracy)
     return np.array(bends), np.array(accuracies)
 
