@@ -308,7 +308,7 @@ def accuracy_vs_bend(
         groups = utils.list_of_groups(frames, "event_id")
         return accuracy_vs_bend(groups, guesses, order, bends)
     bends = sorted(bends)
-    accuracies = [[] for _ in bends]
+    accuracies = [[] for _ in range(len(bends) + 1)]
     for f, frame in enumerate(frames):
         tracks = utils.list_of_groups(frame, "cluster_id")
         guess  = discrete(guesses[f])
@@ -385,10 +385,14 @@ def tracks_crossed(
 
     # Define the minimum and maximum radiuses to compare phi values on.
     # Accounts for case when a track is not full.
-    low_r_1  = track_1_r[np.searchsorted(track_1_r, min_r)]
-    low_r_2  = track_2_r[np.searchsorted(track_2_r, min_r)]
-    high_r_1 = track_1_r[np.searchsorted(track_1_r, max_r)]
-    high_r_2 = track_2_r[np.searchsorted(track_2_r, max_r)]
+    low_r_1  = track_1_r[min([np.searchsorted(track_1_r, min_r),
+                              len(track_1_r) - 1])]
+    low_r_2  = track_2_r[min([np.searchsorted(track_2_r, min_r),
+                              len(track_2_r) - 1])]
+    high_r_1 = track_1_r[min([np.searchsorted(track_1_r, max_r),
+                              len(track_1_r) - 1])]
+    high_r_2 = track_2_r[min([np.searchsorted(track_2_r, max_r),
+                              len(track_2_r) - 1])]
 
     # Find the phis used for comparing if a track crosses another track.
     low_phi_1  = track_1[track_1["r"] ==  low_r_1]["phi"].min() % (2 * np.pi)
