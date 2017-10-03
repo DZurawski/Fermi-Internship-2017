@@ -164,6 +164,7 @@ def prepare_frame(
             "r"          : tuple(event["r"]),
             "phi"        : tuple(event["phi"]),
             "z"          : tuple(event["z"]),
+            "momentum"   : tuple(event["momentum"]),
             "noise"      : tuple([False for _ in range(len(event))]),
             "padding"    : tuple([False for _ in range(len(event))]), })
         n_padding = n_rows - len(clean) - n_noise
