@@ -408,3 +408,29 @@ def tracks_crossed(
     answer *= not ((2 * high_phi_2 < np.pi) and (2 * low_phi_2  > 3 * np.pi))
 
     return answer
+
+def accuracy_vs_momentum(
+        frames    : Union[pd.DataFrame, List[pd.DataFrame]],
+        guesses   : List[np.ndarray],
+        order     : List[str],
+        momentums : List[float],
+        ) -> Tuple[np.ndarray, np.ndarray]:
+    if isinstance(frames, pd.DataFrame):
+        groups = utils.list_of_groups(frames, "event_id")
+        return accuracy_vs_momentum(groups, guesses, order, momentums)
+    momentums = sorted(momentums)
+    accuracies = [[] for _ in range(len(momentums) + 1)]
+    for f, frame in enumerate(frames):
+        tracks = utils.list_of_groups(frame, "cluster_id")
+        guess  = discrete(guesses[f])
+        matrix = ext.extract_output(frame, order)
+        common = np.logical_and(guess, matrix).sum(axis=0)
+        track_lengths = matrix.sum(axis=0)
+        for t, track in enumerate(tracks):
+            if track["noise"].any() or track["padding"].any():
+                continue
+            momentum  = track["momentum"].min()
+            accuracy  = common[t] / track_lengths[t]
+            index     = np.searchsorted(momentums, momentum)
+            accuracies[index].append(accuracy)
+    return np.array(momentums), np.array(accuracies)
