@@ -108,27 +108,6 @@ def input_output_generator(
                    np.array([extract_output(event, order) for event in sample]))
 
 
-def reindex_event_ids(
-        frame : pd.DataFrame
-        ) -> None:
-    frame = frame.copy()
-    ids   = frame["event_id"].sort_values()
-    dic   = dict((event_id, i) for i, event_id in enumerate(ids))
-    frame["event_id"] = frame["event_id"].map(dic)
-
-
-def reindex_cluster_ids(
-        frame : pd.DataFrame
-        ) -> None:
-    events = utils.list_of_groups(frame, group="event_id")
-    for event in events:
-        idx  = event.groupby("cluster_id")["r"].transform(min) == event["r"]
-        lows = event[idx].sort_values(["phi", "z", "r"])
-        dic  = dict((id_, i) for i, id_ in enumerate(lows["cluster_id"]))
-        event["cluster_id"] = event["cluster_id"].map(dic)
-    return np.concat(events)
-
-
 def prepare_frame(
         frame    : pd.DataFrame,
         n_rows   : int = -1,
@@ -150,23 +129,23 @@ def prepare_frame(
     """
     events   = utils.list_of_groups(frame, group="event_id")
     cleans   = []  # The prepared events go in here.
-    n_tracks = metrics.number_of_tracks(frame) if n_tracks < 0 else n_tracks
-    n_rows   = metrics.number_of_hits(frame) + n_noise if n_rows < 0 else n_rows
+    if n_tracks < 0:
+        n_tracks = max([metrics.number_of_tracks(event) for event in events])
+    if n_rows < 0:
+        n_rows = n_noise + max([metrics.number_of_hits(event) for event in events])
     for event_id, event in enumerate(events):
         # Map track ids to indices within a probability matrix.
         idx    = event.groupby("cluster_id")["r"].transform(min) == event["r"]
-        sort   = event[idx].sort_values(["phi", "z", "r"])
+        event  = event.assign(phi=event["phi"] % (2 * np.pi))
+        sort   = event[idx].sort_values(["phi", "r", "z"])
         lows   = pd.unique(sort["cluster_id"])
         id2idx = dict((id_, i) for i, id_ in enumerate(lows))
-        clean  = pd.DataFrame(data={
-            "event_id"   : tuple(event_id for _ in range(len(event))),
-            "cluster_id" : tuple(event["cluster_id"].map(id2idx)),
-            "r"          : tuple(event["r"]),
-            "phi"        : tuple(event["phi"]),
-            "z"          : tuple(event["z"]),
-            "momentum"   : tuple(event["momentum"]),
-            "noise"      : tuple([False for _ in range(len(event))]),
-            "padding"    : tuple([False for _ in range(len(event))]), })
+        clean  = event.assign(
+            event_id   = event_id,
+            cluster_id = event["cluster_id"].map(id2idx),
+            noise      = False,
+            padding    = False,
+        )
         n_padding = n_rows - len(clean) - n_noise
         cleans.append(make_noise(clean, n_tracks, event_id, n_noise))
         cleans.append(make_padding(n_tracks + 1, event_id, n_padding))
@@ -193,15 +172,19 @@ def make_noise(
     :return:
         A pd.DataFrame consisting of noisy hits.
     """
-    min_z, max_z = frame["z"].min(), frame["z"].max()
-    return pd.DataFrame(data={
-        "event_id"   : tuple([event_id for _ in range(n_noise)]),
-        "cluster_id" : tuple([cluster_id for _ in range(n_noise)]),
-        "r"          : tuple(np.random.choice(frame["r"].unique(), n_noise)),
-        "phi"        : tuple(np.random.uniform(-np.pi, np.pi, n_noise)),
-        "z"          : tuple(np.random.uniform(min_z, max_z, n_noise)),
-        "noise"      : tuple([True for _ in range(n_noise)]),
-        "padding"    : tuple([False for _ in range(n_noise)]), })
+    min_z = frame["z"].min()
+    max_z = frame["z"].max()
+    columns = ["event_id", "cluster_id", "r", "phi", "z", "noise" , "padding"]
+    data = np.stack([
+        np.full(n_noise, event_id),
+        np.full(n_noise, cluster_id),
+        np.random.choice(frame["r"].unique(), n_noise),
+        np.random.uniform(0, 2 * np.pi, n_noise),
+        np.random.uniform(min_z, max_z, n_noise),
+        np.full(n_noise, True),
+        np.full(n_noise, False),
+    ], axis=1)
+    return pd.DataFrame(data=data, columns=columns)
 
 
 def make_padding(
@@ -219,11 +202,11 @@ def make_padding(
     :return:
         A pd.DataFrame consisting of the padding rows.
     """
-    return pd.DataFrame(data={
-        "event_id"   : tuple([event_id for _ in range(n_padding)]),
-        "cluster_id" : tuple([cluster_id for _ in range(n_padding)]),
-        "r"          : tuple([np.NaN for _ in range(n_padding)]),
-        "phi"        : tuple([np.NaN for _ in range(n_padding)]),
-        "z"          : tuple([np.NaN for _ in range(n_padding)]),
-        "noise"      : tuple([False for _ in range(n_padding)]),
-        "padding"    : tuple([True for _ in range(n_padding)]), })
+    columns = ["event_id", "cluster_id", "noise", "padding"]
+    data = np.stack([
+        np.full(n_padding, event_id),
+        np.full(n_padding, cluster_id),
+        np.full(n_padding, False),
+        np.full(n_padding, True),
+    ], axis=1)
+    return pd.DataFrame(data=data, columns=columns)
