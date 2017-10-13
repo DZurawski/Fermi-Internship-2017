@@ -30,9 +30,16 @@ def display(
     :return:
         None.
     """
-    table  = pd.DataFrame(ext.extract_input(frame, order), columns=order)
-    target = ext.extract_output(frame, order).round(0)
-    column = [chr(65+i) for i in range(target.shape[1] - 2)] + ["noise", "pad"]
+    table   = pd.DataFrame(ext.extract_input(frame, order), columns=order)
+    target  = ext.extract_output(frame, order).round(0)
+    if target.shape[1] > 1:
+        column  = [chr(65+i) for i in range(target.shape[1] - 2)]
+        noise   = frame["noise"].any()
+        padding = frame["padding"].any()
+        column.append("noise" if noise else chr(65 + target.shape[1] - 2))
+        column.append("padding" if padding else chr(65 + target.shape[1] - 1))
+    else:
+        column = [chr(65)]
     if mode == "guess":
         out_table = pd.DataFrame(data=guess, columns=column).replace(0, "")
         table = pd.concat([table, out_table], axis=1)

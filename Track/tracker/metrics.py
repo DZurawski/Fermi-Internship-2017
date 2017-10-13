@@ -415,6 +415,14 @@ def accuracy_vs_momentum(
         order     : List[str],
         momentums : List[float],
         ) -> Tuple[np.ndarray, np.ndarray]:
+    """ Return the accuracy vs momentum.
+
+    :param frames:
+    :param guesses:
+    :param order:
+    :param momentums:
+    :return:
+    """
     if isinstance(frames, pd.DataFrame):
         groups = utils.list_of_groups(frames, "event_id")
         return accuracy_vs_momentum(groups, guesses, order, momentums)
