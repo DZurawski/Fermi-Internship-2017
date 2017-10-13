@@ -442,3 +442,71 @@ def accuracy_vs_momentum(
             index     = np.searchsorted(momentums, momentum)
             accuracies[index].append(accuracy)
     return np.array(momentums), np.array(accuracies)
+
+
+def closeness_of_tracks(
+        track_1: pd.DataFrame,
+        track_2: pd.DataFrame,
+        ) -> Tuple[float, float, float]:
+    """
+    Typical way to measure closeness of track:
+    Look at DeltaPhi, DeltaEta and DeltaR of the momentum at the origin.
+    eta    = -ln[tan(theta/2)]
+    theta  = atan2(pT, pz)
+    pT     = sqrt(px^2 + py^2)
+    DeltaR = sqrt(DeltaPhi^2 + DeltaEta^2)
+    """
+    h1 = track_1.nsmallest(1, "r")  # Get first layer hit.
+    h2 = track_2.nsmallest(1, "r")  # Get first layer hit.
+    
+    p1, r1, z1 = h1["phi"], h1["r"], h1["z"]
+    p2, r2, z2 = h2["phi"], h2["r"], h2["z"]
+    
+    x1, y1 = r1 * np.cos(p1), r1 * np.sin(p1)
+    x2, y2 = r2 * np.cos(p2), r2 * np.sin(p2)
+    
+    th1 = np.arctan2(np.sqrt(x1**2 + y1**2), z1)
+    th2 = np.arctan2(np.sqrt(x2**2 + y2**2), z2)
+    
+    eta1 = 0 - np.log(np.tan(th1 / 2))
+    eta2 = 0 - np.log(np.tan(th2 / 2))
+    
+    delta_phi = np.sqrt(p1**2 + p2**2)
+    delta_eta = np.sqrt(eta1**2 + eta2**2)
+    delta_r   = np.sqrt(delta_phi**2 + delta_eta**2)
+    
+    # Unsure what to return here.
+    return delta_phi, delta_eta, delta_r
+    
+def accuracy_vs_closeness(
+        frames    : Union[pd.DataFrame, List[pd.DataFrame]],
+        guesses   : List[np.ndarray],
+        order     : List[str],
+        closeness : List[float],
+        ) -> Tuple[np.ndarray, np.ndarray]:
+    if isinstance(frames, pd.DataFrame):
+        groups = utils.list_of_groups(frames, "event_id")
+        return accuracy_vs_bend(groups, guesses, order, closeness)
+    closeness = sorted(bends)
+    accuracies = [[] for _ in range(len(bends) + 1)]
+    for f, frame in enumerate(frames):
+        tracks = utils.list_of_groups(frame, "cluster_id")
+        guess  = discrete(guesses[f])
+        matrix = ext.extract_output(frame, order)
+        common = np.logical_and(guess, matrix).sum(axis=0)
+        track_lengths = matrix.sum(axis=0)
+        for t, track in enumerate(tracks):
+            if track["noise"].any() or track["padding"].any():
+                continue
+            low_phi   = track[track["r"] == track["r"].min()]["phi"].min()
+            high_phi  = track[track["r"] == track["r"].max()]["phi"].min()
+            phi_delta = change_in_phi(low_phi, high_phi)
+            low_r     = track["r"].min()
+            high_r    = track["r"].max()
+            r_delta   = np.abs(high_r - low_r)
+            bend      = ((phi_delta / r_delta) if r_delta != 0 else 0)
+            bend      = np.round(bend * 1000000, 0).astype(int)
+            accuracy  = common[t] / track_lengths[t]
+            index     = np.searchsorted(bends, bend)
+            accuracies[index].append(accuracy)
+    return np.array(bends), np.array(accuracies)
