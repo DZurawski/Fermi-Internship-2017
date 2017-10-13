@@ -204,7 +204,7 @@ class Plot2D:
             for r in pd.unique(self.frame["r"]):
                 self.ax.plot([min_z, max_z], [r, r], alpha=0.1, color="black")
         self.leg = self.ax.legend(loc='upper right', fancybox=True)
-        plt.show(self.ax)
+        plt.show()
 
     def get_values(
             self,
@@ -318,7 +318,7 @@ class Plot3D:
         self.ax.set_ylim3d(z_limits[0], z_limits[1])
         self.ax.set_zlim3d(y_limits[0], y_limits[1])
         self.leg = self.ax.legend(loc='upper right', fancybox=True)
-        plt.show(self.ax)
+        plt.show()
 
     def cartesian(
             self,

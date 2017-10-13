@@ -132,8 +132,12 @@ def prepare_frame(
     if n_tracks < 0:
         n_tracks = max([metrics.number_of_tracks(event) for event in events])
     if n_rows < 0:
-        n_rows = n_noise + max([metrics.number_of_hits(event) for event in events])
+        n_rows = n_noise + max([metrics.number_of_hits(event)
+                            for event in events])
     for event_id, event in enumerate(events):
+        cluster_ids = event["cluster_id"].unique()[:n_tracks]
+        event = event[event["cluster_id"].isin(cluster_ids)]
+        event = event[:n_rows - n_noise]
         # Map track ids to indices within a probability matrix.
         idx    = event.groupby("cluster_id")["r"].transform(min) == event["r"]
         event  = event.assign(phi=event["phi"] % (2 * np.pi))
@@ -146,6 +150,7 @@ def prepare_frame(
             noise      = False,
             padding    = False,
         )
+
         n_padding = n_rows - len(clean) - n_noise
         cleans.append(make_noise(clean, n_tracks, event_id, n_noise))
         cleans.append(make_padding(n_tracks + 1, event_id, n_padding))
