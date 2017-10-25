@@ -7,6 +7,27 @@ from typing import List, Tuple, Optional
 from . import extractor as ext, utils, metrics
 
 
+def display_matrices(
+        data : np.ndarray,
+        target : np.ndarray,
+        decimal : int = 2,
+        order   : Optional[List[str]] = None,
+        noise : bool = True,
+        padding : bool = True,
+        ) -> None:
+    """"""
+    table = pd.DataFrame(data, columns=order)
+    if target.shape[1] > 1:
+        column  = [chr(65+i) for i in range(target.shape[1] - 2)]
+        column.append("noise" if noise else chr(65 + target.shape[1] - 2))
+        column.append("padding" if padding else chr(65 + target.shape[1] - 1))
+    else:
+        column = [chr(65)]
+    out_table = pd.DataFrame(data=target, columns=column).replace(0, "")
+    table = pd.concat([table, out_table], axis=1)
+    with pd.option_context('display.max_columns', None, "display.max_rows", None):
+        IPython.display.display(table)
+
 def display(
         frame   : pd.DataFrame,
         order   : List[str],
@@ -30,8 +51,8 @@ def display(
     :return:
         None.
     """
-    table   = pd.DataFrame(ext.extract_input(frame, order), columns=order)
-    target  = ext.extract_output(frame, order).round(0)
+    table  = pd.DataFrame(ext.extract_input(frame, order), columns=order)
+    target = ext.extract_output(frame, order).round(0)
     if target.shape[1] > 1:
         column  = [chr(65+i) for i in range(target.shape[1] - 2)]
         noise   = frame["noise"].any()
@@ -74,9 +95,7 @@ def display(
     else:
         out_table = pd.DataFrame(data=target, columns=column).replace(0, "")
         table = pd.concat([table, out_table], axis=1)
-    with pd.option_context('display.max_rows', None,
-                           'display.max_columns', None,
-                           'display.max_colwidth', 10000000):
+    with pd.option_context('display.max_columns', 0):
         IPython.display.display(table)
 
 
