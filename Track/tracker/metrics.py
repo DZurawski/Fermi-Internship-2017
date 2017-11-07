@@ -202,7 +202,23 @@ def percent_of_tracks_assigned_correctly(
         do_not_factor_in_padding : bool = True,
         do_not_factor_in_noise   : bool = False,
         ) -> float:
-    """ Get the percent of tracks that were assigned the correct hits. """
+    """ Get the percent of tracks that were assigned the correct hits.
+    :param frames:
+        A set of frames
+    :param guesses:
+        The set of guess matrices.
+    :param order:
+        How to order the input data (phi, r, z)
+    :param percent:
+        For each track, the percent of hits that were correctly assigned to the
+        track in order for that track to be considered as correct.
+    :param do_not_factor_in_padding:
+        If true, the padding column is ignored.
+    :param do_not_factor_in_noise:
+        If true, the noise column is ignored.
+    :return:
+        The percent of tracks among all tracks that were classified correctly.
+    """
     if isinstance(frames, pd.DataFrame):
         return percent_of_tracks_assigned_correctly(
                 [frames], [guesses], order, percent,
@@ -268,6 +284,16 @@ def accuracy_vs_tracks(
         guesses : List[np.ndarray],
         order   : List[str],
         ) -> Tuple[np.ndarray, np.ndarray]:
+    """ Return (x, y), where y is the accuracy and x is the number of tracks.
+    :param frames:
+        A set of frames
+    :param guesses:
+        A set of guess matrices.
+    :param order:
+        How to order (phi, r, z)
+    :return: A tuple consisting of two numpy arrays that can be used to plot
+        this relationship.
+    """
     if isinstance(frames, pd.DataFrame):
         groups = utils.list_of_groups(frames, "event_id")
         return accuracy_vs_tracks(groups, guesses, order)
@@ -284,6 +310,26 @@ def accuracy_vs_thresholds(
         threshes : List[float],
         mode     : str = "correct",  # ("correct", "incorrect", "many", "none")
         ) -> Tuple[np.ndarray, np.ndarray]:
+    """ Return (x, y) such that y is the accuracy and x is the thresholds.
+    :param frames:
+        A set of frames
+    :param guesses:
+        A set of guesses.
+    :param order:
+        How to order input (phi, r, z)
+    :param threshes:
+        A list of floats representing the thresholds necessary for a hit to be
+        classified as correct.
+    :param mode:
+        "correct": Probability that a hit was assigned to the correct track
+            with a probability of at least threshold.
+        "incorrect": Probability that a hit was assigned to at least one
+            incorrect track with a probability of at least threshold.
+        "many": Probability that a hit was assigned to multiple tracks,
+            each with a probability of at least threshold.
+        "none": Probability that a hit had no probability equal to or greater
+            than threshold in any of the tracks.
+    """
     mode  = mode.lower()
     modes = ("correct", "incorrect", "many", "none")
     if mode not in modes:
@@ -409,6 +455,7 @@ def tracks_crossed(
 
     return answer
 
+
 def accuracy_vs_momentum(
         frames    : Union[pd.DataFrame, List[pd.DataFrame]],
         guesses   : List[np.ndarray],
@@ -418,10 +465,13 @@ def accuracy_vs_momentum(
     """ Return the accuracy vs momentum.
 
     :param frames:
+        A set of frames.
     :param guesses:
+        A set of matrices.
     :param order:
+        How to order the input (phi, r, z)
     :param momentums:
-    :return:
+        A set of momentum steps to bin the data in.
     """
     if isinstance(frames, pd.DataFrame):
         groups = utils.list_of_groups(frames, "event_id")
@@ -456,6 +506,7 @@ def closeness_of_tracks(
     pT     = sqrt(px^2 + py^2)
     DeltaR = sqrt(DeltaPhi^2 + DeltaEta^2)
     """
+    # TODO
     h1 = track_1.nsmallest(1, "r")  # Get first layer hit.
     h2 = track_2.nsmallest(1, "r")  # Get first layer hit.
     
@@ -477,36 +528,3 @@ def closeness_of_tracks(
     
     # Unsure what to return here.
     return delta_phi, delta_eta, delta_r
-    
-def accuracy_vs_closeness(
-        frames    : Union[pd.DataFrame, List[pd.DataFrame]],
-        guesses   : List[np.ndarray],
-        order     : List[str],
-        closeness : List[float],
-        ) -> Tuple[np.ndarray, np.ndarray]:
-    if isinstance(frames, pd.DataFrame):
-        groups = utils.list_of_groups(frames, "event_id")
-        return accuracy_vs_bend(groups, guesses, order, closeness)
-    closeness = sorted(bends)
-    accuracies = [[] for _ in range(len(bends) + 1)]
-    for f, frame in enumerate(frames):
-        tracks = utils.list_of_groups(frame, "cluster_id")
-        guess  = discrete(guesses[f])
-        matrix = ext.extract_output(frame, order)
-        common = np.logical_and(guess, matrix).sum(axis=0)
-        track_lengths = matrix.sum(axis=0)
-        for t, track in enumerate(tracks):
-            if track["noise"].any() or track["padding"].any():
-                continue
-            low_phi   = track[track["r"] == track["r"].min()]["phi"].min()
-            high_phi  = track[track["r"] == track["r"].max()]["phi"].min()
-            phi_delta = change_in_phi(low_phi, high_phi)
-            low_r     = track["r"].min()
-            high_r    = track["r"].max()
-            r_delta   = np.abs(high_r - low_r)
-            bend      = ((phi_delta / r_delta) if r_delta != 0 else 0)
-            bend      = np.round(bend * 1000000, 0).astype(int)
-            accuracy  = common[t] / track_lengths[t]
-            index     = np.searchsorted(bends, bend)
-            accuracies[index].append(accuracy)
-    return np.array(bends), np.array(accuracies)
