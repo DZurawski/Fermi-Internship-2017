@@ -15,7 +15,14 @@ def display_matrices(
         noise : bool = True,
         padding : bool = True,
         ) -> None:
-    """"""
+    """ Display the data matrix and the target matrix side-by-side.
+    :param data: The data input matrix.
+    :param target: The target output matrix.
+    :param decimal: How many decimals to round the matrices to.
+    :param order: How to order the data matrix (phi, r, z).
+    :param noise: Whether or not there is noise in the data.
+    :param padding: Whether or not there is padding in the data.
+    """
     table = pd.DataFrame(data, columns=order)
     if target.shape[1] > 1:
         column  = [chr(65+i) for i in range(target.shape[1] - 2)]
