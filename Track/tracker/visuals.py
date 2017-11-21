@@ -8,11 +8,11 @@ from . import extractor as ext, utils, metrics
 
 
 def display_matrices(
-        data : np.ndarray,
-        target : np.ndarray,
+        data    : np.ndarray,
+        target  : np.ndarray,
         decimal : int = 2,
         order   : Optional[List[str]] = None,
-        noise : bool = True,
+        noise   : bool = True,
         padding : bool = True,
         ) -> None:
     """ Display the data matrix and the target matrix side-by-side.
